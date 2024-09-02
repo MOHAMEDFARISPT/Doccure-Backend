@@ -6,6 +6,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './Users/user.Module';
+import { DoctorModule } from './Doctors/doctor.module';
+import { MailService } from './mail/mail.service';
+import { AdminModule } from './Admin/Admin.module';
+
 
 
 
@@ -17,17 +21,15 @@ import { UserModule } from './Users/user.Module';
       envFilePath:'.env',
       isGlobal:true,
     }),
-    
+    UserModule,
     MongooseModule.forRoot(process.env.MONGO_CONNECTION_STRING),
-    UserModule
+    DoctorModule,
+    AdminModule
     
-
-
-  ],
-  controllers:[AppController,],
-  providers:[AppService]
-
-
   
+    
+  ],
+  controllers:[AppController],
+  providers:[AppService, MailService]
 })
 export class AppModule {}

@@ -1,17 +1,19 @@
 /* eslint-disable prettier/prettier */
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Document, Schema as MongooseSchema } from "mongoose";
+import { Schema } from 'mongoose';
 
-@Schema({ timestamps: true }) 
-export class MedicalRecord extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true }) // Reference to User (patient)
-  patientId: MongooseSchema.Types.ObjectId;
+export const MedicalRecordSchema = new Schema({
+  patientId: { type: Schema.Types.ObjectId, ref: 'User', required: true }, // Reference to User
+  doctorId: { type: Schema.Types.ObjectId, ref: 'Doctor', required: true }, // Reference to Doctor
+  records: [
+    {
+      diagnosis: { type: String, required: true },
+      treatment: { type: String, required: true },
+      medications: [{ type: String }], // Array of medications
+      visitDate: { type: Date, default: Date.now },
+      notes: { type: String }
+    }
+  ],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
 
-  @Prop({ required: true })
-  recordType: string;
-
-  @Prop({ required: true })
-  description: string;
-}
-
-export const MedicalRecordSchema = SchemaFactory.createForClass(MedicalRecord);

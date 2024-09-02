@@ -1,15 +1,15 @@
 /* eslint-disable prettier/prettier */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableCors()
 
-  // Enable CORS with specific origin
-  app.enableCors({
-    origin: 'http://localhost:4200',
-  });
-
+ 
+  app.use(bodyParser.json()); // For parsing application/json
+  app.use(bodyParser.urlencoded({ extended: true })); // For parsing appl
   await app.listen(3000);
 }
 bootstrap();
