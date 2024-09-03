@@ -93,9 +93,6 @@ export class AdminService {
           doctor.personalDetails.isApproved = true;
           await doctor.save(); 
     
-         
-          console.log("Saved successfully");
-    
         
           const content = "Congratulations! Your request to Doccure Care Service is approved. You can now log in and start consultation.";
           console.log("doctor.personalDetails.email",doctor.personalDetails.email)

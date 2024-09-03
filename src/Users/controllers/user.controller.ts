@@ -11,12 +11,6 @@ import { ResponseDto } from 'src/Doctors/Dto/createDoctor';
 export class UserController {
     constructor(private readonly userServices:UserService){}
 
-@Post('googlelogin')
-async Googlelogin(@Body() user){
-  return await this.userServices.GoogleAuthentication(user)
-   
-}
-
 
 
 
@@ -28,7 +22,6 @@ async Googlelogin(@Body() user){
     @Post('register')
     async create(@Body() createUserDto: CreateUserDto):Promise<ResponseDto>{
       try {
-        console.log("controller//",createUserDto)
         const response = await this.userServices.createUser(createUserDto);
         return response
       } catch (error) {
@@ -59,8 +52,16 @@ async Googlelogin(@Body() user){
     @Post('login')
     async login(@Body() loginDto:LoginDto):Promise<LoginResponseDto> {
         return this.userServices.login(loginDto);
-        
+      
     }
+
+
+@Post('googlelogin')
+async Googlelogin(@Body() user){
+  return await this.userServices.GoogleAuthentication(user)
+   
+}
+
     
     
 

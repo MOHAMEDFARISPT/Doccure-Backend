@@ -35,7 +35,7 @@ export class CreateUserDto {
 
   @IsString()
   password: string;
-
+  
   @IsString()
   confirmPassword: string;
   
@@ -49,24 +49,26 @@ export class CreateUserDto {
 
 
 //create User ResponseDto
-
-
-export class createUserResponseDto {
+export  interface commonResponse {
   success: boolean;
   message: string;
-  data?:{
-    _id?:string;
-    firstName?:string;
-    lastname?:string;
-    contactnumber?:string;
-    gender?:string;
-    dateofbirth?:Date;
-    email?:string;
-    profileImage?:string;
-    accessToken?:string;
+}
 
+export interface userdatainterface{
+  _id?:string;
+  firstName?:string;
+  lastname?:string;
+  contactnumber?:string;
+  gender?:string;
+  dateofbirth?:Date;
+  email?:string;
+  profileImage?:string;
+  accessToken?:string;
+}
 
-  };
+export interface createUserResponseDto extends  commonResponse{
+ 
+  data?:userdatainterface
 }
 
 

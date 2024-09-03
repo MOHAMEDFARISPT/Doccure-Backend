@@ -12,6 +12,7 @@ import { CreateUserDto } from '../DTO/user.dto'
 import * as crypto from 'crypto';
 import { MailService } from 'src/mail/mail.service';
 import { ResponseDto } from 'src/Doctors/Dto/createDoctor';
+import { create } from 'domain';
 
 
 
@@ -58,7 +59,6 @@ export class UserService {
   
       console.log("New User:", newUser);
       await newUser.save();
-  
       return {
         success: true,
         message: 'User successfully authenticated and registered.',
@@ -93,18 +93,23 @@ export class UserService {
 
   async createUser(_createUserDto: any): Promise<createUserResponseDto> {
     try {
+    console.log("CreateUserDto",_createUserDto)
         const otp = await this.generateOtp();
         const otpExpires = new Date(Date.now() + 15 * 60000); // 15 minutes expiration
         const { email, firstName, lastName, gender, dateOfBirth, contactNumber, password } = _createUserDto;
 
         // Check if the user already exists in the permanent user collection
         const existingUser = await this.userModel.findOne({ email }).exec();
+
         if (existingUser) {
+          console.log("yes",existingUser)
             return {
                 success: false,
                 message: 'User already exists. Please log in.',
             };
         }
+
+
 
         // Check if the user exists in the temporary user collection
         const existingTempUser = await this.TempUserModel.findOne({ email }).exec();
@@ -241,14 +246,6 @@ export class UserService {
       return {
         success: true,
         message: 'User registered successfully',
-        data: {
-          firstName: newUser.firstName,
-          lastname: newUser.lastName,
-          contactnumber: newUser.contactNumber, 
-          gender: newUser.gender,
-          dateofbirth: newUser.dateOfBirth,
-          email: newUser.email,
-        },
       };
     
     } catch (error) {
@@ -275,17 +272,12 @@ export class UserService {
 
 
     const ExistingUser = await this.userModel.findOne({ email }).exec()
-    const payload = { userId: ExistingUser._id, email: ExistingUser.email,role:ExistingUser.role }
-    const Token = this._jwtService.sign(payload)
+ 
     
     if(ExistingUser&&ExistingUser.isGoogle){
       return{
         success:false,
         message:'Account linked to Google. Please continue with Google ',
-        Token:Token
-
-
-
       }
     }
     if (ExistingUser) {
@@ -295,7 +287,8 @@ export class UserService {
       if (passwordmatch) {
 
 
-
+        const payload = { userId: ExistingUser._id, email: ExistingUser.email,role:ExistingUser.role }
+        const Token = this._jwtService.sign(payload)
         
 
         return {

@@ -20,14 +20,13 @@ export class DoctorController {
 
     @Post('Doctor-login')
     async loginDoctor(@Body() loginDatas:loginDoctorDto):Promise<ResponseDto>{
-      const  response= await this.DoctorService.loginDoctor(loginDatas)
-      return response
+      return await this.DoctorService.loginDoctor(loginDatas)
+ 
     }
 
 
     @Get('loadDoctorDatas')
     async loadDoctorDatas() {
-      console.log("get it in controllers////")
       return await this.DoctorService.loadDoctorDatas();
      
     }

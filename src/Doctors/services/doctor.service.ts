@@ -18,7 +18,6 @@ export class DoctorService {
 
 
       async loadDoctorDatas(): Promise<void> {
-        console.log("service file")
         // Fetch all doctors from the database
         const doctors = await this.doctorModel.find().exec();
     

@@ -8,7 +8,6 @@ export class AdminController {
 
     @Get('getPatients')
     getPatients():any{
-        console.log("/////////")
         return this.adminservice.fetchPatients();
     }
     
