@@ -5,12 +5,12 @@ import { Schema, Document, model } from 'mongoose';
 // Define the interface for the doctor document
 export interface DoctorModel extends Document {
     personalDetails: {
-    firstname: string;
-    lastname: string;
+    firstName: string;
+    lastName: string;
     email: string;
     gender: string;
     contactNumber: string;
-    dateOfBirth: Date;
+    dateofBirth: Date;
     password: string;
     isApproved:Boolean;
     profileImage:string;
@@ -36,12 +36,12 @@ export interface DoctorModel extends Document {
 // Define the schema
 export const DoctorSchema = new Schema({
   personalDetails: {
-    firstname: { type: String, required: true },
-    lastname: { type: String, required: true },
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     gender: { type: String, required: true },
     contactNumber: { type: String, required: true },
-    dateOfBirth: { type: Date, required: true },
+    dateofBirth: { type: Date, required: true },
     password: { type: String, required: true },
     isApproved:{type:Boolean,default:false},
     profileImage:{type:String,default:''},

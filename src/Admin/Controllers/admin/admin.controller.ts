@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prettier/prettier */
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AdminService } from 'src/Admin/Services/admin/admin.service';
@@ -6,19 +7,20 @@ import { AdminService } from 'src/Admin/Services/admin/admin.service';
 export class AdminController {
     constructor(private adminservice:AdminService){}
 
-    @Get('getPatients')
-    getPatients():any{
+    @Get('loadUserDatas')
+    getPatients(){
+       
         return this.adminservice.fetchPatients();
     }
     
     @Get('Doctor-Requests')
     getDoctorRequests(){
-        return this.adminservice.getDoctorrequests();
+        return this.adminservice.getDoctorRequests();
     }
 
 
     @Post('accept-request')
-     acceptRequest(@Body() acceptRequestDto:any){
+     acceptRequest(@Body() acceptRequestDto:string){
         return this.adminservice.acceptRequest(acceptRequestDto)
 
      }

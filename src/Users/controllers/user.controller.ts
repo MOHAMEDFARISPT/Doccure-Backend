@@ -2,8 +2,8 @@
 /* eslint-disable prettier/prettier */
 import { Body, Controller,Post } from '@nestjs/common';
 import { UserService } from '../Services/user.service';
-import { CreateUserDto, createUserResponseDto, LoginDto, LoginResponseDto } from '../DTO/user.dto';
-import { ResponseDto } from 'src/Doctors/Dto/createDoctor';
+import { commonResponse, createUserResponse, User, userlogin } from '../Interfaces/UserInterface';
+
 
 
 
@@ -20,45 +20,41 @@ export class UserController {
 
 
     @Post('register')
-    async create(@Body() createUserDto: CreateUserDto):Promise<ResponseDto>{
-      try {
-        const response = await this.userServices.createUser(createUserDto);
-        return response
-      } catch (error) {
-        console.error('Error during registration:', error); // Logging error for debugging
-        return {
-          success: false,
-          message: 'Something went wrong. Please try again later.'
-        };
-      }
-    }
+  async create(@Body() createUserDto: User): Promise<commonResponse> {
+    return await this.userServices.createUser(createUserDto);
+  }
 
 
 
     @Post('verify-Otp')
-    async verifyOtp(@Body() body: { otp: string, email: string }):Promise<ResponseDto>{
-      const { otp, email } = body;
-      console.log(otp,email)
-      try {
-        const response=await this.userServices.verifyUser(otp,email)
-        return response
-      } catch (error) {
-        
-      }
-      
-    }
+  async verifyOtp(@Body() body: { otp: string, email: string }): Promise<createUserResponse> {
+  const { otp, email } = body;
+  console.log(otp, email);
+  try {
+    const response = await this.userServices.verifyUser(otp, email);
+    return response;
+  } catch (error) {
+    console.error('Error during OTP verification:', error); // Logging error for debugging
+    return {
+      success: false,
+      message: 'OTP verification failed. Please try again later.',
+    };
+  }
+}
 
 
     @Post('login')
-    async login(@Body() loginDto:LoginDto):Promise<LoginResponseDto> {
-        return this.userServices.login(loginDto);
-      
-    }
+    async login(@Body() loginDto:userlogin):Promise<createUserResponse> {
+    return await  this.userServices.login(loginDto)
 
+
+    }
 
 @Post('googlelogin')
 async Googlelogin(@Body() user){
   return await this.userServices.GoogleAuthentication(user)
+
+
    
 }
 

@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule} from '@nestjs/jwt';
 
@@ -8,6 +8,7 @@ import { UserController } from './controllers/user.controller';
 import { UserService } from './Services/user.service';
 import { ConfigModule } from '@nestjs/config';
 import { MailService } from 'src/mail/mail.service';
+import { JwtMiddleware } from './middlwares/auth.middlware';
 
 @Module({
   imports: [
@@ -25,4 +26,10 @@ import { MailService } from 'src/mail/mail.service';
   controllers: [UserController], // Register the controller
   providers: [UserService,MailService], // Register the service
 })
-export class UserModule {}
+export class UserModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(JwtMiddleware)
+      .forRoutes({ path: 'users/my-appointments', method: RequestMethod.ALL }); 
+  }
+}

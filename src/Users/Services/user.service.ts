@@ -6,12 +6,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { LoginResponseDto, LoginDto, createUserResponseDto } from '../DTO/user.dto';
-import { Tempuser, User } from '../Interfaces/UserInterface';
-import { CreateUserDto } from '../DTO/user.dto'
+import { createUserResponse, Tempuser, User, userlogin } from '../Interfaces/UserInterface';
 import * as crypto from 'crypto';
 import { MailService } from 'src/mail/mail.service';
-import { ResponseDto } from 'src/Doctors/Dto/createDoctor';
 import { create } from 'domain';
 
 
@@ -34,12 +31,15 @@ export class UserService {
     return otp;
   }
 
-  async GoogleAuthentication(user: any): Promise<createUserResponseDto> {
-    const { uid, email, displayName,stsTokenManager: { accessToken }  } = user
+  async GoogleAuthentication(user: any): Promise<createUserResponse> {
+    const { uid, email, displayName, stsTokenManager: { accessToken } } = user;
+    
     if (!displayName || !email || !uid) {
       throw new InternalServerErrorException("Internal Server Error. Try Again");
     }
+  
     const existingUser = await this.userModel.findOne({ email }).exec();
+  
     if (existingUser && existingUser.isBlocked) {
       return {
         success: false,
@@ -47,35 +47,30 @@ export class UserService {
       };
     }
   
+    let userId: string;
     if (!existingUser) {
-      console.log("Creating new user...");
-  
       const newUser = new this.userModel({
         firstName: displayName.split(' ')[0],
         lastName: displayName.split(' ').slice(1).join(' '),
         email,
         isGoogle: true,
       });
-  
-      console.log("New User:", newUser);
+      
       await newUser.save();
-      return {
-        success: true,
-        message: 'User successfully authenticated and registered.',
-        data: {
-        _id: newUser._id.toString(),
-         accessToken,
-        },
-      };
+      userId = newUser._id.toString();
+    } else {
+      userId = existingUser._id.toString();
     }
   
-    // If the user exists and is not blocked, return a success response
+    const payload = { firstname: displayName.split(' ')[0], email, role: 'user' };
+    const jwtToken = this._jwtService.sign(payload);
+  
     return {
       success: true,
-      message: 'User successfully authenticated.',
+      message: existingUser ? 'User successfully authenticated.' : 'User successfully authenticated and registered.',
       data: {
-        _id: existingUser._id.toString(),
-        accessToken, 
+        _id: userId,
+        accessToken: jwtToken,
       },
     };
   }
@@ -91,89 +86,74 @@ export class UserService {
 
 
 
-  async createUser(_createUserDto: any): Promise<createUserResponseDto> {
-    try {
-    console.log("CreateUserDto",_createUserDto)
-        const otp = await this.generateOtp();
-        const otpExpires = new Date(Date.now() + 15 * 60000); // 15 minutes expiration
-        const { email, firstName, lastName, gender, dateOfBirth, contactNumber, password } = _createUserDto;
+  async createUser(_createUserDto: User): Promise<createUserResponse> {
+    const otp = await this.generateOtp();
+    const otpExpires = new Date(Date.now() + 15 * 60000); // 15 minutes expiration
+    const { email, firstName, lastName, gender, dateOfBirth, contactNumber, password } = _createUserDto;
 
-        // Check if the user already exists in the permanent user collection
-        const existingUser = await this.userModel.findOne({ email }).exec();
+    // Check if the user already exists in the permanent user collection
+    const existingUser = await this.userModel.findOne({ email }).exec();
 
-        if (existingUser) {
-          console.log("yes",existingUser)
-            return {
-                success: false,
-                message: 'User already exists. Please log in.',
-            };
-        }
-
-
-
-        // Check if the user exists in the temporary user collection
-        const existingTempUser = await this.TempUserModel.findOne({ email }).exec();
-
-        if (existingTempUser) {
-            // Resend OTP if user already exists in TempUser and hasn't verified OTP
-            existingTempUser.otp = otp;
-            existingTempUser.otpExpires = otpExpires;
-            await existingTempUser.save();
-
-            const content = `Your verification OTP is <b><strong>${otp}</strong></b>. It expires in 15 minutes.`;
-
-            await this.mailservice.sendWelcomeEmail(email, firstName, content);
-
-            return {
-                success: true,
-                message: 'You already have a pending verification. Please verify your account with the new OTP sent to your email.',
-                data: {
-                    email: existingTempUser.email
-                }
-            };
-        }
-
-        // If not in TempUser, create a new temporary user
-        const temporaryUser = new this.TempUserModel({
-            firstName,
-            lastName,
-            email,
-            gender,
-            dateOfBirth,
-            contactNumber,
-            password,
-            otp,
-            otpExpires,
-        });
-
-        const content = `Your verification OTP is <b><strong>${otp}</strong></b>. It expires in 15 minutes.`;
-
-        await this.mailservice.sendWelcomeEmail(email, firstName, content);
-
-        // Save the temporary user
-        await temporaryUser.save();
-
-        return {
-            success: true,
-            message: 'Please verify your account with the OTP sent to your email.',
-            data: {
-                email: temporaryUser.email
-            }
-        };
-
-    } catch (error) {
-        console.error("Error in createUser:", error);
-
-        // Return a failure response with a generic error message
-        return {
-            success: false,
-            message: 'An error occurred while creating the user. Please try again later.',
-        };
+    if (existingUser) {
+      return {
+        success: false,
+        message: 'User already exists. Please log in.',
+      };
     }
-}
+
+    // Check if the user exists in the temporary user collection
+    const existingTempUser = await this.TempUserModel.findOne({ email }).exec();
+
+    if (existingTempUser) {
+      // Resend OTP if user already exists in TempUser and hasn't verified OTP
+      existingTempUser.otp = otp;
+      existingTempUser.otpExpires = otpExpires;
+      await existingTempUser.save();
+
+      const content = `Your verification OTP is <b><strong>${otp}</strong></b>. It expires in 15 minutes.`;
+
+      await this.mailservice.sendWelcomeEmail(email, firstName, content);
+
+      return {
+        success: true,
+        message: 'You already have a pending verification. Please verify your account with the new OTP sent to your email.',
+        data: {
+          email: existingTempUser.email,
+        },
+      };
+    }
+
+    // If not in TempUser, create a new temporary user
+    const temporaryUser = new this.TempUserModel({
+      firstName,
+      lastName,
+      email,
+      gender,
+      dateOfBirth,
+      contactNumber,
+      password,
+      otp,
+      otpExpires,
+    });
+
+    const content = `Your verification OTP is <b><strong>${otp}</strong></b>. It expires in 15 minutes.`;
+
+    await this.mailservice.sendWelcomeEmail(email, firstName, content);
+
+    // Save the temporary user
+    await temporaryUser.save();
+
+    return {
+      success: true,
+      message: 'Please verify your account with the OTP sent to your email.',
+      data: {
+        email: temporaryUser.email,
+      },
+    };
+  }
 
 
-  async verifyUser(otpValue: string, email: string): Promise<createUserResponseDto> {
+  async verifyUser(otpValue: string, email: string): Promise<createUserResponse> {
     try {
       const checkTempUser = await this.TempUserModel.findOne({ email }).exec();
     
@@ -264,7 +244,7 @@ export class UserService {
 
 
 
-  async login(loginDto: LoginDto): Promise<LoginResponseDto> {
+  async login(loginDto:userlogin ): Promise<createUserResponse> {
 
     const { email, password } = loginDto
 
@@ -287,7 +267,7 @@ export class UserService {
       if (passwordmatch) {
 
 
-        const payload = { userId: ExistingUser._id, email: ExistingUser.email,role:ExistingUser.role }
+        const payload = { userId: ExistingUser._id.toString(), email: ExistingUser.email,role:ExistingUser.role }
         const Token = this._jwtService.sign(payload)
         
 
@@ -296,15 +276,16 @@ export class UserService {
           message: 'Login SuccessFully',
           data: {
             _id: ExistingUser._id.toString(),
-            firstname: ExistingUser.firstName,
+            firstName: ExistingUser.firstName,
             lastname: ExistingUser.lastName,
             contactnumber: ExistingUser.contactNumber,
             gender: ExistingUser.gender,
             dateofbirth: ExistingUser.dateOfBirth,
-            email: ExistingUser.email
-          },
-          Token: Token
-        }
+            email: ExistingUser.email,
+            accessToken: Token
+          }
+          }
+         
 
 
       } else {

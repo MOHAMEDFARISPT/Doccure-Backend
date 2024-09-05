@@ -3,13 +3,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { DoctorModel } from '../schema/doctor.schema';
 import * as bcrypt from 'bcrypt';
-import { DoctorRegistrationDto,ResponseDto, loginDoctorDto } from '../Dto/createDoctor';
 import { JwtService } from '@nestjs/jwt';
 import { MailService } from 'src/mail/mail.service';
+
+import { AvailableTime, combinedInterface, doctorLogin, doctorrequestsResponseDto } from '../interfaces/DoctorInterface';
 
 export class DoctorService {
     constructor(
         @InjectModel('Doctor') private readonly doctorModel: Model<DoctorModel>,
+        @InjectModel('availableTimes') private readonly availabletimes:Model<AvailableTime>,
         private readonly _jwtService: JwtService,
         private  readonly mailservice:MailService
 
@@ -25,18 +27,19 @@ export class DoctorService {
         const doctorData: any = doctors.map(doctor => ({
           _id: doctor._id.toString(),
           personalDetails: {
-            firstname: doctor.personalDetails.firstname,
-            lastname: doctor.personalDetails.lastname,
+            firstName: doctor.personalDetails.firstName,
+            lastName: doctor.personalDetails.lastName,
             email: doctor.personalDetails.email,
             gender: doctor.personalDetails.gender,
             contactNumber: doctor.personalDetails.contactNumber,
-            dateOfBirth: doctor.personalDetails.dateOfBirth,
+            dateofBirth: doctor.personalDetails.dateofBirth,
             password: doctor.personalDetails.password,
             profileImage: doctor.personalDetails.profileImage,
             isApproved: doctor.personalDetails.isApproved,
             isBlocked: doctor.personalDetails.isBlocked,
             role: doctor.personalDetails.role,
           },
+
           generalDetails: {
             city: doctor.generalDetails.city,
             state: doctor.generalDetails.state,
@@ -60,8 +63,10 @@ export class DoctorService {
 
 
 
-    async CreateDoctor(registerDoctorDto: DoctorRegistrationDto): Promise<ResponseDto> {
+    async CreateDoctor(registerDoctorDto: combinedInterface): Promise<doctorrequestsResponseDto> {
+      console.log("registerDoctorDto/////",registerDoctorDto)
         const { email, password, ...otherPersonalDetails } = registerDoctorDto.personalDetails;
+        console.log(email,password)
       
         const existingDoctor = await this.doctorModel.findOne({ 'personalDetails.email': email }).exec();
         
@@ -84,7 +89,7 @@ export class DoctorService {
           await newDoctor.save();
  
          const  content="Wlcome to the Doccure Care Service you will get an E-mail After You verified "
-          await this.mailservice.sendWelcomeEmail(email,otherPersonalDetails.lastname,content); 
+          await this.mailservice.sendWelcomeEmail(email,otherPersonalDetails.lastName,content); 
 
 
           // Return response according to createDoctorDto
@@ -93,9 +98,9 @@ export class DoctorService {
             message: "Doctor registered successfully",
             data:{
                 _id:newDoctor._id.toString(),
-                personalDetailes:newDoctor.personalDetails,
+                personalDetails:newDoctor.personalDetails,
                 generalDetails:newDoctor.generalDetails,
-                professionalDetales:newDoctor.professionalDetails
+                professionalDetails:newDoctor.professionalDetails
 
             }
           };
@@ -114,7 +119,7 @@ export class DoctorService {
       }
 
 
-      async loginDoctor(loginDatas: loginDoctorDto): Promise<ResponseDto> {
+      async loginDoctor(loginDatas: doctorLogin): Promise<doctorrequestsResponseDto> {
         const { email, password } = loginDatas;
        
       
@@ -124,20 +129,23 @@ export class DoctorService {
           const passwordMatch = await bcrypt.compare(password, ExistingDoctor.personalDetails.password);
       
           if (passwordMatch) {
-            const payload = { userId: ExistingDoctor._id, email: ExistingDoctor.personalDetails.email,role:ExistingDoctor.personalDetails.role };
-            const Token = this._jwtService.sign(payload);
+            const payload = { userId: ExistingDoctor._id.toString(), email: ExistingDoctor.personalDetails.email,role:ExistingDoctor.personalDetails.role };
+            const token = this._jwtService.sign(payload);
+
+            console.log("payload///",payload)
       
-            const { lastname } = ExistingDoctor.personalDetails;
+            const { lastName } = ExistingDoctor.personalDetails;
+          
             return {
               success: true,
-              message: lastname + ' Logged In Successfully',
+              message: lastName + ' Logged In Successfully',
               data: {
                 _id: ExistingDoctor._id.toString(),
-                personalDetailes: ExistingDoctor.personalDetails,
+                personalDetails: ExistingDoctor.personalDetails,
                 generalDetails: ExistingDoctor.generalDetails,
-                professionalDetales: ExistingDoctor.professionalDetails
+                professionalDetails: ExistingDoctor.professionalDetails
               },
-              Token: Token
+              token: token
             };
           } else {
             return {
@@ -151,6 +159,15 @@ export class DoctorService {
             message: 'Doctor is not registered, please register'
           };
         }
+      }
+
+
+
+
+      createAvailableTime(availableTimeData:AvailableTime){
+        console.log("availableTimeData",availableTimeData)
+        
+
       }
       
     

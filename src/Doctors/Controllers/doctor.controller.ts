@@ -1,7 +1,8 @@
 /* eslint-disable prettier/prettier */
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { DoctorService } from '../services/doctor.service';
-import { DoctorRegistrationDto, ResponseDto, loginDoctorDto } from '../Dto/createDoctor';
+import { AvailableTime, combinedInterface, doctorLogin, doctorrequestsResponseDto } from '../interfaces/DoctorInterface';
+
 
 @Controller('doctors')
 export class DoctorController {
@@ -10,7 +11,7 @@ export class DoctorController {
     constructor(private DoctorService:DoctorService){}
 
     @Post('Doctor-Register')
-    async CreateDoctor(@Body() registerDoctorDto:DoctorRegistrationDto):Promise<ResponseDto>{
+    async CreateDoctor(@Body() registerDoctorDto:combinedInterface):Promise<doctorrequestsResponseDto>{
        const response=await this.DoctorService.CreateDoctor(registerDoctorDto)
        return response
         
@@ -19,7 +20,7 @@ export class DoctorController {
 
 
     @Post('Doctor-login')
-    async loginDoctor(@Body() loginDatas:loginDoctorDto):Promise<ResponseDto>{
+    async loginDoctor(@Body() loginDatas:doctorLogin):Promise<doctorrequestsResponseDto>{
       return await this.DoctorService.loginDoctor(loginDatas)
  
     }
@@ -30,6 +31,13 @@ export class DoctorController {
       return await this.DoctorService.loadDoctorDatas();
      
     }
+
+
+  @Post()
+  async createAvailableTime(@Body() availableTimeData: AvailableTime) {
+   const result= this.DoctorService.createAvailableTime(availableTimeData);
+   console.log(result)
+  }
 
 
 
