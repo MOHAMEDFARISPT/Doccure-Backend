@@ -49,6 +49,7 @@ export class AdminService {
             professionalDetails: {
               medicalLicenceNumber: doctor.professionalDetails.medicalLicenceNumber,
               specialisedDepartment: doctor.professionalDetails.specialisedDepartment,
+              bio:doctor.professionalDetails.bio,
               totalExperience: doctor.professionalDetails.totalExperience,
               patientsPerDay: doctor.professionalDetails.patientsPerDay,
               consultationFee: doctor.professionalDetails.consultationFee,

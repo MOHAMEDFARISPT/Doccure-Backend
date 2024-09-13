@@ -5,6 +5,7 @@
 
 
 
+
 export interface doctorLogin{
     email:string;
     password:string
@@ -50,6 +51,7 @@ export interface doctorLogin{
   export interface professionalDetails {
     medicalLicenceNumber: string;
     specialisedDepartment: string;
+    bio:string;
     totalExperience: number;
     patientsPerDay: number;
     consultationFee: number;
@@ -74,9 +76,26 @@ export interface doctorLogin{
   
 
 
-export interface AvailableTime{
-  day: string;
-  startTime: string;
-  endTime: string;
-  doctorId: string; 
-}
+  export interface AvailableTimeInterface {
+    day: string;
+    startTime: string;
+    endTime: string;
+    doctorId: string; 
+  }
+
+  export interface Slot {
+    _id: string;  
+    startTime: string;
+    endTime: string;
+    DoctorId:string;
+  }
+  
+  // Interface for the response
+  export interface AvailableTimeResponse {
+    slots?: Slot[];
+    success: boolean;
+    message: string;
+  }
+
+
+  

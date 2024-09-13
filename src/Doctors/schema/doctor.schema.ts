@@ -27,6 +27,7 @@ export interface DoctorModel extends Document {
   professionalDetails: {
     medicalLicenceNumber: string;
     specialisedDepartment:string;
+    bio:string;
     totalExperience: number;
     patientsPerDay: number;
     consultationFee: number;
@@ -57,6 +58,7 @@ export const DoctorSchema = new Schema({
   },
   professionalDetails: {
     medicalLicenceNumber: { type: String, required: true },
+    bio:{type:String,required:true},
     specialisedDepartment:{type:String,required:true},
     totalExperience: { type: Number, required: true },
     patientsPerDay: { type: Number, required: true },

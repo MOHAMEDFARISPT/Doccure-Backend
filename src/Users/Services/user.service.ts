@@ -3,23 +3,26 @@
 /* eslint-disable prettier/prettier */
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { createUserResponse, Tempuser, User, userlogin } from '../Interfaces/UserInterface';
 import * as crypto from 'crypto';
 import { MailService } from 'src/mail/mail.service';
 import { create } from 'domain';
-
+import { AvailableTimeInterface, AvailableTimeResponse, Slot } from 'src/Doctors/interfaces/DoctorInterface';
+import { ObjectId } from 'mongoose';
 
 
 
 
 @Injectable()
 export class UserService {
+ 
   constructor(
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Tempuser') private TempUserModel: Model<Tempuser>,
+    @InjectModel('availableTimes') private readonly AvailableTimeModel:Model<AvailableTimeInterface>,
     private readonly _jwtService: JwtService,
     private readonly mailservice: MailService
   ) { }
@@ -88,7 +91,7 @@ export class UserService {
 
   async createUser(_createUserDto: User): Promise<createUserResponse> {
     const otp = await this.generateOtp();
-    const otpExpires = new Date(Date.now() + 15 * 60000); // 15 minutes expiration
+    const otpExpires = new Date(Date.now() + 15 * 60000);
     const { email, firstName, lastName, gender, dateOfBirth, contactNumber, password } = _createUserDto;
 
     // Check if the user already exists in the permanent user collection
@@ -237,13 +240,6 @@ export class UserService {
 
 
 
-
-
-
-
-
-
-
   async login(loginDto:userlogin ): Promise<createUserResponse> {
 
     const { email, password } = loginDto
@@ -255,6 +251,7 @@ export class UserService {
  
     
     if(ExistingUser&&ExistingUser.isGoogle){
+     
       return{
         success:false,
         message:'Account linked to Google. Please continue with Google ',
@@ -304,5 +301,39 @@ export class UserService {
 
   }
 
+
+
+
+
+  async findAvailableSlots(doctorId: string, day: string):Promise<AvailableTimeResponse> {
+    const objectId = new Types.ObjectId(doctorId);
+
+
+
+    const availableTimes = await this.AvailableTimeModel.find({doctorId: objectId,day: day,}).exec();
+
+ 
+
+   const slots:Slot[]=availableTimes.map((slot)=>({
+    _id:slot._id.toString(),
+    DoctorId:slot.doctorId,
+    startTime:slot.startTime,
+    endTime:slot.endTime
+
+   }))
+
+   return {
+    slots,
+    success:true,
+    message:'',
+   }
+  
+
+  
+  }
+
 }
+
+
+
 

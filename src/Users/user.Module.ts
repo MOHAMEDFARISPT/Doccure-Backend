@@ -9,18 +9,20 @@ import { UserService } from './Services/user.service';
 import { ConfigModule } from '@nestjs/config';
 import { MailService } from 'src/mail/mail.service';
 import { JwtMiddleware } from './middlwares/auth.middlware';
+import { availableTimeSchema } from 'src/Doctors/schema/availableTimes.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name:'User', schema: UserSchema }]),
     MongooseModule.forFeature([{name:'Tempuser',schema:TemporaryUser}]),
+    MongooseModule.forFeature([{name:'availableTimes',schema:availableTimeSchema}]),
     ConfigModule.forRoot({
         envFilePath:'.env',
         isGlobal:true,
       }),
     JwtModule.register({
       secret:process.env.JWT_SECRET,
-      signOptions: { expiresIn: '1m' }, 
+      signOptions: { expiresIn: '2d' }, 
     }),
   ],
   controllers: [UserController], // Register the controller

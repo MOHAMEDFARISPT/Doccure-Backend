@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prettier/prettier */
-import { Body, Controller,Post } from '@nestjs/common';
+import { Body, Controller,Get,Param,Post, Query } from '@nestjs/common';
 import { UserService } from '../Services/user.service';
 import { commonResponse, createUserResponse, User, userlogin } from '../Interfaces/UserInterface';
+import { AvailableTimeResponse } from 'src/Doctors/interfaces/DoctorInterface';
 
 
 
@@ -34,7 +35,7 @@ export class UserController {
     const response = await this.userServices.verifyUser(otp, email);
     return response;
   } catch (error) {
-    console.error('Error during OTP verification:', error); // Logging error for debugging
+    
     return {
       success: false,
       message: 'OTP verification failed. Please try again later.',
@@ -45,7 +46,9 @@ export class UserController {
 
     @Post('login')
     async login(@Body() loginDto:userlogin):Promise<createUserResponse> {
-    return await  this.userServices.login(loginDto)
+        const result=await  this.userServices.login(loginDto)
+        console.log(result)
+        return result
 
 
     }
@@ -57,6 +60,21 @@ async Googlelogin(@Body() user){
 
    
 }
+
+@Get('available-times')
+async getAvailableTimes(
+
+  @Query('drid') doctorId: string,
+  @Query('selectedDay') selectedDay: string,
+): Promise<AvailableTimeResponse> {
+
+
+
+  // Assuming your service has a method that finds by doctorId and selectedDay
+  return await this.userServices.findAvailableSlots(doctorId, selectedDay);
+ 
+}
+
 
     
     
