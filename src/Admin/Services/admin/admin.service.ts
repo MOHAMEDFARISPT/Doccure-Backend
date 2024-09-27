@@ -81,8 +81,6 @@ export class AdminService {
     
         
           const content = "Congratulations! Your request to Doccure Care Service is approved. You can now log in and start consultation.";
-          console.log("doctor.personalDetails.email",doctor.personalDetails.email)
-          console.log("doctor.personalDetails.lastname",doctor.personalDetails.lastName)
           await this.mailService.sendWelcomeEmail(doctor.personalDetails.email, doctor.personalDetails.lastName, content);
     
       

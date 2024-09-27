@@ -2,8 +2,10 @@
 /* eslint-disable prettier/prettier */
 import { Body, Controller,Get,Param,Post, Query } from '@nestjs/common';
 import { UserService } from '../Services/user.service';
-import { commonResponse, createUserResponse, User, userlogin } from '../Interfaces/UserInterface';
+import { Appointmentcreation, commonResponse, createUserResponse, IWallet, User, userlogin } from '../Interfaces/UserInterface';
 import { AvailableTimeResponse } from 'src/Doctors/interfaces/DoctorInterface';
+import { Console } from 'console';
+import { Observable } from 'rxjs';
 
 
 
@@ -46,9 +48,9 @@ export class UserController {
 
     @Post('login')
     async login(@Body() loginDto:userlogin):Promise<createUserResponse> {
-        const result=await  this.userServices.login(loginDto)
-        console.log(result)
-        return result
+        return  await  this.userServices.login(loginDto)
+
+      
 
 
     }
@@ -67,18 +69,77 @@ async getAvailableTimes(
   @Query('drid') doctorId: string,
   @Query('selectedDay') selectedDay: string,
 ): Promise<AvailableTimeResponse> {
-
-
-
-  // Assuming your service has a method that finds by doctorId and selectedDay
   return await this.userServices.findAvailableSlots(doctorId, selectedDay);
  
 }
 
 
-    
-    
-
+@Get('loaduserData')
+async loadUserData(@Query('userId') userId:string) {
+return this.userServices.loaduserData(userId)
 
 }
+
+
+
+@Post('createOrder')
+createOrder(@Body() createOrderDto: { amount: number; currency: string }) {
+  return this.userServices.createOrder(createOrderDto.amount, createOrderDto.currency);
+}
+
+@Post('verifypayment')
+verifyPayment(@Body() verifyPaymentDto: any) {
+
+  
+  return this.userServices.verifyPayment(verifyPaymentDto);
+}
+
+@Post('createAppointment')
+createAppointment(@Body() appointmentData:Appointmentcreation):Promise<commonResponse>{
+ return this.userServices.createAppointment(appointmentData)
+
+}
+
+@Get('getWallet/:userId') 
+
+getWallet(@Param('userId') userId: string){
+  return this.userServices.getWallet(userId)
+
+}
+
+@Get('getAppointments')
+getAppointments(@Query('patientId') patientId:string){
+  return this.userServices.getAppointments(patientId)
+}
+
+@Get('getappointment')
+getAppointment( @Query('apmntId') apmntId: string, @Query('userId') userId: string,){
+return this.userServices.getappointment(apmntId,userId)
+}
+
+
+
+@Post('cancellAppointment')
+async cancellAppointment(@Body() payload:{appointmentId:string,userId:string,reason:string}){
+ const {appointmentId,userId,reason}=payload
+
+ return this.userServices.cancellAppointment(appointmentId,userId,reason)
+
+}
+
+}
+
+
+
+
+
+
+
+
+
+    
+    
+
+
+
 

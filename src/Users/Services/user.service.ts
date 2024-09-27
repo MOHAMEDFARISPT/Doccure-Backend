@@ -1,31 +1,49 @@
 /* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prettier/prettier */
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { createUserResponse, Tempuser, User, userlogin } from '../Interfaces/UserInterface';
+import { Appointmentcreation, commonResponse, createUserResponse, IWallet, Tempuser, User, userlogin } from '../Interfaces/UserInterface';
 import * as crypto from 'crypto';
 import { MailService } from 'src/mail/mail.service';
 import { create } from 'domain';
-import { AvailableTimeInterface, AvailableTimeResponse, Slot } from 'src/Doctors/interfaces/DoctorInterface';
-import { ObjectId } from 'mongoose';
+import { AvailableTimeInterface, AvailableTimeResponse, responseData, Slot } from 'src/Doctors/interfaces/DoctorInterface';
+import { Wallet } from '../Schema/Wallet.schema';
+import { types } from 'util';
+import { ObjectId } from 'mongodb';
+import Razorpay from 'razorpay';
+import { Appointment } from '../Schema/Appointment.Schema';
+import { UserModel } from '../Schema/user.Schema';
+
+
+
 
 
 
 
 @Injectable()
 export class UserService {
+  
+  private razorpay: Razorpay;
  
   constructor(
-    @InjectModel('User') private userModel: Model<User>,
+    @InjectModel('User') private userModel: Model<UserModel>,
     @InjectModel('Tempuser') private TempUserModel: Model<Tempuser>,
     @InjectModel('availableTimes') private readonly AvailableTimeModel:Model<AvailableTimeInterface>,
+    @InjectModel('Appointment') private readonly appointmentModel: Model<Appointment>,
+    @InjectModel('wallet') private readonly walletModel:Model<Wallet>,
     private readonly _jwtService: JwtService,
-    private readonly mailservice: MailService
-  ) { }
+    private readonly mailservice: MailService,
+ 
+  ) { 
+    this.razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
 
 
 
@@ -60,8 +78,10 @@ export class UserService {
       });
       
       await newUser.save();
+     
       userId = newUser._id.toString();
     } else {
+     
       userId = existingUser._id.toString();
     }
   
@@ -72,6 +92,7 @@ export class UserService {
       success: true,
       message: existingUser ? 'User successfully authenticated.' : 'User successfully authenticated and registered.',
       data: {
+
         _id: userId,
         accessToken: jwtToken,
       },
@@ -138,6 +159,7 @@ export class UserService {
       otp,
       otpExpires,
     });
+    console.log("otp",otp)
 
     const content = `Your verification OTP is <b><strong>${otp}</strong></b>. It expires in 15 minutes.`;
 
@@ -161,7 +183,6 @@ export class UserService {
       const checkTempUser = await this.TempUserModel.findOne({ email }).exec();
     
       if (!checkTempUser) {
-        console.log("Temporary user not found");
         return {
           success: false,
           message: 'Temporary user not found',
@@ -170,11 +191,7 @@ export class UserService {
     
       const otpExpiry = checkTempUser.otpExpires;
       const currentTime = new Date();
-  
-      console.log("is otp Expired",currentTime>otpExpiry)
-  
-      console.log("Current Time:", currentTime);
-      console.log("OTP Expiry Time:", otpExpiry);
+
     
       if (currentTime > otpExpiry) {
         console.log("OTP has expired");
@@ -216,11 +233,18 @@ export class UserService {
       });
     
       await newUser.save();
+
+      const newWallet=new this.walletModel({
+        userId:newUser._id,
+        balance:0,
+        transactions:[],
+
+  
+      })
+
+      await newWallet.save()
     
       const content = "Your Registration Verified With Your OTP Successfully";
-      console.log('Email:', newUser.email);
-      console.log('First Name:', newUser.firstName);
-      console.log('Content:', content);
     
       await this.mailservice.sendWelcomeEmail(newUser.email, newUser.firstName, content);
     
@@ -232,7 +256,6 @@ export class UserService {
       };
     
     } catch (error) {
-      console.error("An error occurred:", error);
       throw new Error('User verification failed');
     }
   }
@@ -252,11 +275,9 @@ export class UserService {
     
     if(ExistingUser&&ExistingUser.isGoogle){
      
-      return{
-        success:false,
-        message:'Account linked to Google. Please continue with Google ',
-      }
+      throw new HttpException('Account linked to Google. Please continue with Google.', HttpStatus.BAD_REQUEST);
     }
+   
     if (ExistingUser) {
 
       const passwordmatch = await bcrypt.compare(password, ExistingUser.password)
@@ -266,7 +287,8 @@ export class UserService {
 
         const payload = { userId: ExistingUser._id.toString(), email: ExistingUser.email,role:ExistingUser.role }
         const Token = this._jwtService.sign(payload)
-        
+       
+       
 
         return {
           success: true,
@@ -274,7 +296,7 @@ export class UserService {
           data: {
             _id: ExistingUser._id.toString(),
             firstName: ExistingUser.firstName,
-            lastname: ExistingUser.lastName,
+            lastName: ExistingUser.lastName,
             contactnumber: ExistingUser.contactNumber,
             gender: ExistingUser.gender,
             dateofbirth: ExistingUser.dateOfBirth,
@@ -286,10 +308,7 @@ export class UserService {
 
 
       } else {
-        return {
-          success: false,
-          message: 'Invalid Credential Please Check Your Password'
-        }
+        throw new UnauthorizedException('Invalid credentials. Please check your password.')
       }
 
     } else {
@@ -305,34 +324,301 @@ export class UserService {
 
 
 
-  async findAvailableSlots(doctorId: string, day: string):Promise<AvailableTimeResponse> {
-    const objectId = new Types.ObjectId(doctorId);
+  async findAvailableSlots(doctorId: string, day: string): Promise<AvailableTimeResponse> {
+    try {
+      const parsedId=new ObjectId(doctorId)
+  
+  
+  
+     
+      const availableTimes = await this.AvailableTimeModel.find({
+        doctorId: parsedId,
+        day: day  
+      }).exec();
+  
+   
+  
+      // Map the results to slots
+      const slots: Slot[] = availableTimes.map((slot) => ({
+        _id: slot._id.toString(),
+        DoctorId: slot.doctorId,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        isBooked:slot.isBooked
+
+      }));
+  
+      return {
+        slots,
+        success: true,
+        message: '',
+      };
+    } catch (error) {
+      console.error("Error fetching available slots:", error);
+      return {
+        slots: [],
+        success: false,
+        message: 'Error fetching available slots',
+      };
+    }
+  }
+  
+  
 
 
 
-    const availableTimes = await this.AvailableTimeModel.find({doctorId: objectId,day: day,}).exec();
+
+  async loaduserData(userId:string):Promise<createUserResponse>{
+
+    const parsedId = new Types.ObjectId(userId);
+
+    let user=await this.userModel.findOne({_id:parsedId}).exec()
+
+
+
+    return {
+      data:{
+        _id:user._id.toString(),
+        firstName:user.firstName,
+        lastName:user.lastName,
+        gender:user.gender,
+        dateofbirth:user.dateOfBirth,
+        contactnumber:user.contactNumber,
+        email:user.email,
+        profileImage:user.profileImage
+  
+      }
+      
+    }
+
+  }
+
+
+
+  async createOrder(amount: number, currency: string) {
+    const options = {
+      amount: amount, // Amount in paise
+      currency: currency,
+    };
+    return this.razorpay.orders.create(options);
+  }
+
+  async verifyPayment(verifyPaymentDto: any) {
+    const generatedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(verifyPaymentDto.order_id + '|' + verifyPaymentDto.payment_id)
+      .digest('hex');
+
+    if (generatedSignature === verifyPaymentDto.razorpay_signature) {
+      return { success: true };
+    } else {
+      return { success: false };
+    }
+  }
+
+
+  async createAppointment(appointmentData: Appointmentcreation): Promise<commonResponse> {
+    const {
+        patientId,
+        doctorId,
+        slotId,
+        totalAmount,
+        PaymentMethod,
+        paymentStatus,
+        consultationType,
+    } = appointmentData;
+
+    if (PaymentMethod === "wallet") {
+        const parsedId = new ObjectId(patientId);
+    
+
+        const UserWallet = await this.walletModel.findOne({ userId: parsedId }).exec();
+
+        // Check if the user has enough balance
+        if (UserWallet.balance < totalAmount) {
+            return {
+                success: false,
+                message: 'Insufficient funds in your wallet',
+            };
+        } else {
+            // Deduct the amount from the wallet
+            const updatedBalance = UserWallet.balance - totalAmount;
+
+            // Create a new appointment
+            const parsedPatientId = new Types.ObjectId(patientId);
+            const parsedDoctorId = new Types.ObjectId(doctorId);
+            const parsedSlotId = new Types.ObjectId(slotId);
+
+            const newAppointment = new this.appointmentModel({
+                patientId: parsedPatientId,
+                doctorId: parsedDoctorId,
+                slotId: parsedSlotId,
+                totalAmount,
+                PaymentMethod,
+                paymentStatus,
+                consultationType,
+            });
+
+            await newAppointment.save();
+
+            // Update wallet balance and add a transaction for the debit
+            await this.walletModel.updateOne(
+                { userId: parsedId },
+                {
+                    $set: { balance: updatedBalance },
+                    $push: {
+                        transactions: {
+                            amount: totalAmount,
+                            type: 'Debit',
+                            description: `Payment for appointment`
+                        }
+                    }
+                }
+            ).exec();
+
+            // Mark the slot as booked
+            await this.AvailableTimeModel.findOneAndUpdate(
+                { _id: parsedSlotId },
+                { isBooked: true },
+                { new: true }
+            ).exec();
+
+            return {
+                success: true,
+                message: 'Slot booked successfully'
+            };
+        }
+    } else if (PaymentMethod === 'razorpay') {
+        const parsedPatientId = new Types.ObjectId(patientId);
+        const parsedDoctorId = new Types.ObjectId(doctorId);
+        const parsedSlotId = new Types.ObjectId(slotId);
+        
+        const newAppointment = new this.appointmentModel({
+            patientId: parsedPatientId,
+            doctorId: parsedDoctorId,
+            slotId: parsedSlotId,
+            totalAmount,
+            PaymentMethod,
+            paymentStatus,
+            consultationType,
+        });
+
+        await newAppointment.save();
+
+        // Mark the slot as booked
+        await this.AvailableTimeModel.findOneAndUpdate(
+            { _id: parsedSlotId },
+            { isBooked: true },
+            { new: true }
+        ).exec();
+
+        return {
+            success: true,
+            message: 'Slot booked successfully'
+        };
+    }
+}
+
+
+
+
+async getWallet(userId:string):Promise<IWallet>{
+  const parsedId=new ObjectId(userId)
+  let userWallet=await this.walletModel.findOne({userId:parsedId}).exec()
+  if(userWallet){
+    const formattedTransactions = userWallet.transactions.map((transaction) => ({
+      transactionId: transaction.transactionId.toString(),
+      amount: transaction.amount,
+      type: transaction.type,
+      description: transaction.description,
+    }));
+    return {
+      _id: userWallet._id.toString(),
+      userId: userWallet.userId.toString(),
+      balance: userWallet.balance,
+      transactions: formattedTransactions,  // Add formatted transactions
+      createdAt: userWallet.createdAt,
+      updatedAt: userWallet.updatedAt,
+    };
+  }
+  
+ 
+}
+
+async getAppointments(patientId:string):Promise<Appointment[]>{
+
+  const parsedpatientId=new ObjectId(patientId)
+  console.log(parsedpatientId)
+  const result=await this.appointmentModel.find({ patientId:parsedpatientId })
+  .populate('slotId')
+  .populate('doctorId')
+  .populate('patientId')
+  .exec()
+
+
+
+  
+ return result as Appointment[]
+}
+
+async getappointment(apmntId: string,userId: string):Promise<Appointment> {
+  const parsedPatientId=new ObjectId(userId)
+  const parsedappoinmentId=new ObjectId(apmntId)
+  const result = await this.appointmentModel.findOne({
+    patientId: parsedPatientId,
+    _id:parsedappoinmentId
+  })
+  .populate('doctorId')
+  .populate('patientId')
+  .populate('slotId')
+
+  return result as Appointment
+}
+
+
+
+async cancellAppointment(appointmentId:string,userId:string,reason:string){
+
+  const parsedAppointmentId=new ObjectId(appointmentId)
+  const parseduserId=new ObjectId(userId)
+
+  console.log("parsedAppointmentId",parsedAppointmentId)
+  console.log('parseduserId',parseduserId)
+  console.log('reason',reason)
+
+  let Appointment=await this.appointmentModel.findOne({_id:parsedAppointmentId,patientId:parseduserId}).exec()
+
+ Appointment.isCancelled=true;
+ Appointment.cancellationReason=reason
+ Appointment.consultaionStatus='cancelled'
+
+ await Appointment.save()
+
+ let wallet=await this.walletModel.findOne({userId:parseduserId}).exec()
+
+ let AppointmentPaymentAmount=wallet.transactions
+
+
 
  
 
-   const slots:Slot[]=availableTimes.map((slot)=>({
-    _id:slot._id.toString(),
-    DoctorId:slot.doctorId,
-    startTime:slot.startTime,
-    endTime:slot.endTime
+}
+ 
 
-   }))
 
-   return {
-    slots,
-    success:true,
-    message:'',
-   }
-  
 
-  
-  }
+
+
+
 
 }
+
+
+   
+
+
+
+
 
 
 

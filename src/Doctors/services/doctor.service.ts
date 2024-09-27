@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prettier/prettier */
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { DoctorModel } from '../schema/doctor.schema';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -9,12 +9,16 @@ import { MailService } from 'src/mail/mail.service';
 import { ObjectId } from 'mongodb';
 
 import {  AvailableTimeInterface, AvailableTimeResponse, combinedInterface, doctorLogin, doctorrequestsResponseDto, Slot } from '../interfaces/DoctorInterface';
+import { types } from 'util';
+import { promises } from 'dns';
+import { Appointment, commonResponse } from 'src/Users/Interfaces/UserInterface';
 
 
 export class DoctorService {
     constructor(
         @InjectModel('Doctor') private readonly doctorModel: Model<DoctorModel>,
         @InjectModel('availableTimes') private readonly AvailableTimeModel:Model<AvailableTimeInterface>,
+        @InjectModel('Appointment') private readonly appointmentModel: Model<Appointment>,
         private readonly _jwtService: JwtService,
         private  readonly mailservice:MailService
 
@@ -25,6 +29,8 @@ export class DoctorService {
       async loadDoctorDatas(): Promise<void> {
         // Fetch all doctors from the database
         const doctors = await this.doctorModel.find().exec();
+
+
     
         // Map the fetched doctors to the DoctorRegistrationDto
         const doctorData: any = doctors.map(doctor => ({
@@ -66,10 +72,91 @@ export class DoctorService {
       }
 
 
+   async loadDoctorData(doctorId:string):Promise<doctorrequestsResponseDto>{
+    
+    const parsedDoctorId = new ObjectId(doctorId);
+   
+ 
+const Doctor=await this.doctorModel.findOne({_id:parsedDoctorId}).exec()
+return {
+  success: true,
+   message: "Doctor registered successfully",
+   data:{
+    _id:Doctor._id.toString(),
+    personalDetails:{
+      firstName:Doctor.personalDetails.firstName,
+      lastName:Doctor.personalDetails.lastName,
+      email:Doctor.personalDetails.email,
+      gender:Doctor.personalDetails.gender,
+      contactNumber:Doctor.personalDetails.contactNumber,
+      dateofBirth:Doctor.personalDetails.dateofBirth,
+      profileImage:Doctor.personalDetails.profileImage
+
+    },
+    generalDetails:{
+      city:Doctor.generalDetails.city,
+      state:Doctor.generalDetails.state,
+      country:Doctor.generalDetails.country,
+      zipcode:Doctor.generalDetails.zipcode,
+      adharNumber:Doctor.generalDetails.adharNumber
+
+    },
+   professionalDetails:{
+    medicalLicenceNumber:Doctor.professionalDetails.medicalLicenceNumber,
+    specialisedDepartment:Doctor.professionalDetails.specialisedDepartment,
+    bio:Doctor.professionalDetails.bio,
+    totalExperience:Doctor.professionalDetails.totalExperience,
+    patientsPerDay:Doctor.professionalDetails.patientsPerDay,
+    consultationFee:Doctor.professionalDetails.consultationFee
+
+   }
+   }
+}
+   }
+
+   async changePassword(body: { oldPassword: string, newPassword: string, confirmPassword: string, doctorId: string }):Promise<commonResponse>{
+
+    const {oldPassword,newPassword,confirmPassword,doctorId}=body
+
+ 
+
+      const ExistingUser=await this.doctorModel.findOne({_id:doctorId}).exec()
+
+
+      const isPasswordValid = await bcrypt.compare(oldPassword, ExistingUser.personalDetails.password);
+
+      if (!isPasswordValid) {
+        return {
+          success:false,
+          message:'Old password is incorrect please check'
+        }
+      }
+    
+      // Check if newPassword and confirmPassword match
+      if (newPassword !== confirmPassword) {
+        return {
+          success:false,
+          message:'newPassword and confirmPassword are not match'
+        }
+       
+      }
+
+       
+  const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+  ExistingUser.personalDetails.password = hashedNewPassword;
+  await ExistingUser.save();
+  return {
+    success: true,
+    message: 'Password changed successfully',
+  };
+
+   }
+
+
 
     async CreateDoctor(registerDoctorDto: combinedInterface): Promise<doctorrequestsResponseDto> {
         const { email, password, ...otherPersonalDetails } = registerDoctorDto.personalDetails;
-        console.log(email,password)
+ 
       
         const existingDoctor = await this.doctorModel.findOne({ 'personalDetails.email': email }).exec();
         
@@ -135,7 +222,7 @@ export class DoctorService {
             const payload = { userId: ExistingDoctor._id.toString(), email: ExistingDoctor.personalDetails.email,role:ExistingDoctor.personalDetails.role };
             const token = this._jwtService.sign(payload);
 
-            console.log("payload///",payload)
+   
       
             const { lastName } = ExistingDoctor.personalDetails;
           
@@ -169,7 +256,6 @@ export class DoctorService {
 
       async createAvailableTime(availableTimeData: AvailableTimeInterface):Promise<AvailableTimeResponse> {
         const { startTime, endTime, day, doctorId } = availableTimeData;
-        console.log("service", day, doctorId, endTime, startTime);
       
         try {
             // Find if any existing time slot overlaps with the new time range
@@ -177,9 +263,9 @@ export class DoctorService {
                 day,
                 doctorId,
                 $or: [
-                    { startTime: { $lt: endTime, $gte: startTime } }, // Existing slot starts within new slot range
-                    { endTime: { $gt: startTime, $lte: endTime } },   // Existing slot ends within new slot range
-                    { startTime: { $lte: startTime }, endTime: { $gte: endTime } } // Existing slot fully contains new slot
+                    { startTime: { $lt: endTime, $gte: startTime } }, 
+                    { endTime: { $gt: startTime, $lte: endTime } },  
+                    { startTime: { $lte: startTime }, endTime: { $gte: endTime } }
                 ]
             }).exec();
       
@@ -217,12 +303,14 @@ export class DoctorService {
    
 
 async getSlots(day: string, doctorId: string): Promise<AvailableTimeResponse> {
-  const result = await this.AvailableTimeModel.find({ day: day, doctorId: doctorId }).exec();
+  const parsedId=new ObjectId(doctorId)
+  const result = await this.AvailableTimeModel.find({ day:day,doctorId: parsedId }).exec();
   
   const slots: Slot[] = result.map((slot) => ({
     _id: slot._id.toString(),  
     DoctorId:slot.doctorId,
     startTime: slot.startTime,
+    isBooked:slot.isBooked,
     endTime: slot.endTime,
   }));
 
@@ -237,7 +325,11 @@ async getSlots(day: string, doctorId: string): Promise<AvailableTimeResponse> {
 
       async deleteAllSlots(day:string,doctorId:string):Promise<AvailableTimeResponse>{
       
-        const result = await this.AvailableTimeModel.deleteMany({ day, doctorId });
+
+        const parsedDoctorId=new ObjectId(doctorId)
+
+  const result = await this.AvailableTimeModel.deleteMany({ day, doctorId: parsedDoctorId });
+
         if (!result) {
           return {
             success:false,
@@ -258,10 +350,9 @@ async getSlots(day: string, doctorId: string): Promise<AvailableTimeResponse> {
         try {
           const objectIdSlot = new ObjectId(Slotid);
           const objectIdDoctor = new ObjectId(doctorId);
-          console.log("objectIdSlot",objectIdSlot)
-          console.log("objectIdDoctor",objectIdDoctor)
+        
           const existing = await this.AvailableTimeModel.findOne({ _id: objectIdSlot });
-            console.log("existing",existing)
+
           if (!existing) {
             return { success: false, message: "Slot not found" };
           }
@@ -275,6 +366,49 @@ async getSlots(day: string, doctorId: string): Promise<AvailableTimeResponse> {
           console.error("Error deleting slot:", error);
           return { success: false, message: "Failed to delete slot" }; 
         }
+      }
+
+
+
+      async uploadProfile(secure_url,doctorId){
+
+        const ExistingDoctor=await this.doctorModel.findOne({_id:doctorId}).exec()
+
+        if(ExistingDoctor){
+          ExistingDoctor.personalDetails.profileImage=secure_url
+
+        await  ExistingDoctor.save()
+        }
+
+      }
+
+
+
+      async getAppointments(DoctorId:string):Promise<Appointment[]>{
+        const parsedDoctorId=new ObjectId(DoctorId)
+        
+        const result=await this.appointmentModel.find({doctorId:parsedDoctorId})
+        .populate('doctorId')
+        .populate('patientId')
+        .populate('slotId')
+
+
+        return result as Appointment[]
+      }
+
+
+      async loadAppointments():Promise<Appointment[]>{
+
+        const result=await this.appointmentModel.find()
+
+        .populate('patientId')
+        .populate('doctorId')
+        .populate('slotId')
+      
+ 
+        return result as Appointment[]
+
+
       }
       
 

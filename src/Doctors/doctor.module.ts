@@ -9,12 +9,16 @@ import { JwtModule } from '@nestjs/jwt';
 import { MailModule } from 'src/mail/mail.module';
 import { ApproveCheckMiddleware } from './middlwares/approve-check/approve-check.middleware'
 import { availableTimeSchema } from './schema/availableTimes.schema';
+import { AppointmentSchema } from 'src/Users/Schema/Appointment.Schema';
+
 
 @Module({
   imports: [
     MailModule,
     MongooseModule.forFeature([{ name: 'Doctor', schema: DoctorSchema }]),
     MongooseModule.forFeature([{name:'availableTimes',schema:availableTimeSchema}]),
+    MongooseModule.forFeature([{ name: 'Appointment', schema: AppointmentSchema }]),
+   
     ConfigModule.forRoot({
       envFilePath: '.env',
       isGlobal: true,

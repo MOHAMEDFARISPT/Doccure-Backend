@@ -33,7 +33,7 @@ export interface doctorLogin{
     gender: string;
     contactNumber: string;
     dateofBirth: Date;
-    password: string;
+    password?: string;
     profileImage?: string;
     isApproved?: Boolean;
     isBlocked?: Boolean;
@@ -81,6 +81,7 @@ export interface doctorLogin{
     startTime: string;
     endTime: string;
     doctorId: string; 
+    isBooked?:boolean
   }
 
   export interface Slot {
@@ -88,6 +89,7 @@ export interface doctorLogin{
     startTime: string;
     endTime: string;
     DoctorId:string;
+    isBooked?:boolean
   }
   
   // Interface for the response

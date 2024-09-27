@@ -19,7 +19,7 @@ export class ApproveCheckMiddleware implements NestMiddleware {
 
     try {
       const doctor = await this.doctorService.findByEmail(email);
-      console.log("doctor",doctor)
+
       if (!doctor) {
         return res.status(HttpStatus.NOT_FOUND).json({
           success: false,
@@ -32,7 +32,6 @@ export class ApproveCheckMiddleware implements NestMiddleware {
             message: 'Your account is not approved yet.',
           });
         }
-        console.log("nest will work")
         next(); // Pass control to the next middleware or route handler
 
       }
