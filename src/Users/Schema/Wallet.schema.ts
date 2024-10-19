@@ -1,12 +1,10 @@
-/* eslint-disable prettier/prettier */
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Document, Schema as MongooseSchema } from "mongoose";
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Wallet extends Document {
-
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
-  userId: MongooseSchema.Types.ObjectId;
+  userId: Types.ObjectId; // Use 'Types.ObjectId' for better typing compatibility
 
   @Prop({ default: 0 })
   balance: number;
@@ -14,11 +12,18 @@ export class Wallet extends Document {
   @Prop({
     type: [
       {
-        transactionId: { type: MongooseSchema.Types.ObjectId, auto: true },  // Auto-generating transactionId
+        transactionId: {
+          type: MongooseSchema.Types.ObjectId,
+          default: new Types.ObjectId(),
+        },
         amount: { type: Number, required: true },
-        type: { type: String, enum: ['Debit', 'Credit'], required: true },   // Enum for type validation
+        type: { type: String, enum: ['Debit', 'Credit'], required: true },
         description: { type: String },
-        appointmentId: { type: MongooseSchema.Types.ObjectId, ref: 'Appointment', required: true }, // New field for appointmentId
+        appointmentId: {
+          type: MongooseSchema.Types.ObjectId,
+          ref: 'Appointment',
+          required: true,
+        },
         createdAt: { type: Date, default: Date.now },
         updatedAt: { type: Date, default: Date.now },
       },
@@ -26,16 +31,15 @@ export class Wallet extends Document {
     default: [],
   })
   transactions: {
-    transactionId: MongooseSchema.Types.ObjectId;
+    transactionId: Types.ObjectId;
     amount: number;
-    type: 'Debit' | 'Credit';  // Limited to Debit or Credit
+    type: 'Debit' | 'Credit'; // Enforced as an enum type
     description?: string;
-    appointmentId: MongooseSchema.Types.ObjectId;  
+    appointmentId: Types.ObjectId;
     createdAt?: Date;
     updatedAt?: Date;
   }[];
 
-  // Add createdAt and updatedAt fields for the wallet itself
   createdAt?: Date;
   updatedAt?: Date;
 }

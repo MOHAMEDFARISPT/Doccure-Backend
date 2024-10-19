@@ -13,7 +13,10 @@ export interface DoctorModel extends Document {
     dateofBirth: Date;
     password: string;
     isApproved:Boolean;
+    regCancelreason:string;
+    isRegcancelled:boolean;
     profileImage:string;
+    isFavourite?:boolean;
     isBlocked:Boolean;
     role:string;
   };
@@ -46,7 +49,10 @@ export const DoctorSchema = new Schema({
     password: { type: String, required: true },
     isApproved:{type:Boolean,default:false},
     profileImage:{type:String,default:''},
+    isFavourite: { type: Boolean, default: false },
     isBlocked:{type:Boolean,default:false},
+    regCancelreason:{type:String,default:''},
+    isRegcancelled:{type:Boolean,default:false},
     role:{type:String,default:false}
   },
   generalDetails: {

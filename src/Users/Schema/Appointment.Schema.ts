@@ -12,7 +12,8 @@ export interface Appointment extends Document {
   paymentStatus: string;
   consultationType: string;
   consultaionStatus:string;
-  isCancelled: boolean; 
+  iscancelledbyDoctor: boolean; 
+  isCancelledbypatient:boolean;
   cancellationReason?: string; 
 }
 
@@ -57,9 +58,14 @@ export const AppointmentSchema = new Schema<Appointment>({
      enum:['upcoming','cancelled','compleated']
 
   },
-  isCancelled: {
+  iscancelledbyDoctor: {
     type: Boolean,
     default: false, 
+  },
+  isCancelledbypatient:{
+    type:Boolean,
+    default:false
+
   },
   cancellationReason: {
     type: String,

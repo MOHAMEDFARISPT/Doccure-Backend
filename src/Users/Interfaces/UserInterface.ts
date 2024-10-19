@@ -19,6 +19,15 @@ export interface User  {
 
   }
 
+  export interface userProfileDetailes {
+    firstName: string;
+    lastName: string;
+    gender: string;
+    dateOfBirth: Date;
+    contactNumber: string;
+    email: string;
+  }
+
 
   export interface userlogin{
     email:string;
@@ -45,9 +54,9 @@ export interface userdataResponseinterface{
   _id?:string;
   firstName?:string;
   lastName?:string;
-  contactnumber?:string;
+  contactNumber?:string;
   gender?:string;
-  dateofbirth?:Date;
+  dateOfBirth?:Date;
   email?:string;
   profileImage?:string;
   accessToken?:string;
@@ -56,6 +65,15 @@ export interface userdataResponseinterface{
 export interface createUserResponse extends  commonResponse{
  
   data?:userdataResponseinterface
+}
+
+
+
+
+export interface changepassword{
+  currentPassword:string;
+  newPassword:string;
+  confirmPassword:string
 }
 
 export interface Appointmentcreation {
@@ -117,6 +135,8 @@ export interface Appointmentcreation {
     password?: string;
     profileImage?: string;
     isApproved?: boolean;
+    isFavourite?:boolean;
+    regCancelreason:string;
     isBlocked?: boolean;
     role?: string;
   }
@@ -169,7 +189,8 @@ export interface Appointmentcreation {
     paymentStatus: string;
     consultationType: string;
     consultaionStatus: string;
-    isCancelled: boolean;
+    iscancelledbyDoctor: boolean;
+    isCancelledbypatient: boolean;
     cancellationReason?: string;
     __v: number;
   }

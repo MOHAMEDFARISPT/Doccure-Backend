@@ -37,6 +37,8 @@ export interface doctorLogin{
     profileImage?: string;
     isApproved?: Boolean;
     isBlocked?: Boolean;
+    isFavourite?:boolean;
+    regCancelreason?:string;
     role?: string;
   }
   
@@ -64,6 +66,12 @@ export interface doctorLogin{
     professionalDetails:professionalDetails
   
   }
+  export interface DoctorStatistics {
+    totalPatients: number;
+    totalAppointments: number;
+    totalEarnings: number;
+  }
+  
   
   
   
@@ -71,7 +79,7 @@ export interface doctorLogin{
     success?: boolean;
     message?: string;
      data?:combinedInterface | combinedInterface[]
-     token?: string; 
+     Token?: string; 
   }
   
 

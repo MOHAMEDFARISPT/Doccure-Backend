@@ -1,14 +1,15 @@
 /* eslint-disable prettier/prettier */
 
-import { Module } from '@nestjs/common';
+import {   Module,   } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './Users/user.Module';
 import { DoctorModule } from './Doctors/doctor.module';
 import { MailService } from './mail/mail.service';
 import { AdminModule } from './Admin/Admin.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
+
 
 
 
@@ -26,8 +27,11 @@ import { AdminModule } from './Admin/Admin.module';
     UserModule,
     DoctorModule,
     AdminModule,
+    CloudinaryModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [AppService, MailService],
 })
-export class AppModule {}
+export class AppModule   {
+ 
+}
