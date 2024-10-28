@@ -78,6 +78,11 @@ export class UserController {
    return  this.userServices.uploadProfileImage(file,userId)
 
   }
+  @Post('refresh')
+  async refreshAccessToken(@Body('refreshToken') refreshToken: string): Promise<{ accessToken: string }> {
+    console.log("Helloooooooooo/////")
+    return this.userServices.refreshAccessToken(refreshToken);
+  }
 
   @Post('updateProfileDetailes')
   async updateProfileDetailes(@Body() body:{updateProfileDetailes:userProfileDetailes,userId:string}){
@@ -98,8 +103,8 @@ export class UserController {
   }
 
   @Get('getAllDoctors')
-  async getAllDoctors() {
-    return this.userServices.getAllDoctors();
+  async getAllDoctors(@Query('page') currentPage:number,@Query('limit') limit:number) {
+    return this.userServices.getAllDoctors(Number(currentPage),Number(limit));
   }
   @Get('filteronExperience')
   async getDoctorsByExperience(
@@ -174,9 +179,9 @@ export class UserController {
   async likeDoctor(@Body() body: { doctorId: string }) {
     const { doctorId } = body;
     console.log('doctorId?>>>>>><>.>>>>>', doctorId);
-    const result = this.userServices.likeDoctor(doctorId);
-    console.log(result);
-    return result;
+    return this.userServices.likeDoctor(doctorId);
+    
+   
   }
 
   @Get('available-times')
@@ -192,16 +197,23 @@ export class UserController {
     return this.userServices.loaduserData(userId);
   }
 
+  @Get('fetchDoctor')
+  async fetchDoctor(@Query('doctorId') doctorId:string){
+    console.log(doctorId)
+    const result=await this.userServices.fetchDoctor(doctorId)
+    console.log('result///',result)
+    return result
+  }
+
   @Post('createOrder')
-  createOrder(@Body() createOrderDto: { amount: number; currency: string }) {
-    return this.userServices.createOrder(
-      createOrderDto.amount,
-      createOrderDto.currency,
-    );
+  async createOrder(@Body() createOrderDto: { amount: number; currency: string }) {
+    const result=await this.userServices.createOrder(createOrderDto.amount,createOrderDto.currency,);
+    return result
   }
 
   @Post('verifypayment')
   verifyPayment(@Body() verifyPaymentDto: any) {
+    console.log("verifyPaymentDto",verifyPaymentDto)
     return this.userServices.verifyPayment(verifyPaymentDto);
   }
 
@@ -213,14 +225,15 @@ export class UserController {
   }
 
   @Get('getWallet/:userId')
-  getWallet(@Param('userId') userId: string) {
-    return this.userServices.getWallet(userId);
+  getWallet(@Query('page') currentPage:number,@Query('limit') limit:number, @Param('userId') userId: string) {
+    return this.userServices.getWallet(userId,currentPage,Number(limit));
   }
 
   @Get('getAppointments')
-  getAppointments(@Query('patientId') patientId: string) {
-    return this.userServices.getAppointments(patientId);
+  getAppointments(@Query('patientId') patientId: string,@Query('page') currentPage: number,@Query('limit') limit: number,@Query('selectedStatus') selectedStatus: string) {
+    return this.userServices.getAppointments(patientId,currentPage,limit,selectedStatus);
   }
+  selectedStatus
 
   @Get('getappointment')
   getAppointment(

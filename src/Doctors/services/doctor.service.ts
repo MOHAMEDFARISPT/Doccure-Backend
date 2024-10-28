@@ -15,12 +15,17 @@ import {
   doctorLogin,
   doctorrequestsResponseDto,
   DoctorStatistics,
+  generalDetails,
+  personalDetails,
+  professionalDetails,
   Slot,
+  UpcomingAppointmentOverView,
 } from '../interfaces/DoctorInterface';
 import { types } from 'util';
 import { promises } from 'dns';
 import {
   Appointment,
+  AppointmentResponse,
   commonResponse,
 } from 'src/Users/Interfaces/UserInterface';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
@@ -30,6 +35,11 @@ import { UserModel } from 'src/Users/Schema/user.Schema';
 import { Wallet, WalletSchema } from 'src/Users/Schema/Wallet.schema';
 import { existsSync } from 'fs';
 import { Console } from 'console';
+import {
+  speciality,
+  specialityDocument,
+} from 'src/Admin/Schema/speciality.schema';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 export class DoctorService {
   constructor(
@@ -42,6 +52,9 @@ export class DoctorService {
     @InjectModel('User') private userModel: Model<UserModel>,
     private readonly _jwtService: JwtService,
     private readonly mailservice: MailService,
+    @InjectModel(speciality.name)
+    private SpecialityModel: Model<specialityDocument>,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   async loadDoctorDatas(): Promise<void | InternalServerErrorException> {
@@ -80,6 +93,7 @@ export class DoctorService {
           specialisedDepartment:
             doctor.professionalDetails.specialisedDepartment,
           bio: doctor.professionalDetails.bio,
+          MedicalDocument:doctor.professionalDetails.MedicalDocument,
           totalExperience: doctor.professionalDetails.totalExperience,
           patientsPerDay: doctor.professionalDetails.patientsPerDay,
           consultationFee: doctor.professionalDetails.consultationFee,
@@ -95,7 +109,7 @@ export class DoctorService {
     }
   }
 
-  async getDoctorStatistics(doctorId: string){
+  async getDoctorStatistics(doctorId: string) {
     const parsedDoctorId = new ObjectId(doctorId);
     const appointments = await this.appointmentModel
       .find({ doctorId: parsedDoctorId })
@@ -115,19 +129,62 @@ export class DoctorService {
     const totalPatients = uniquePatients.length;
 
     return {
-      totalAppointments : totalAppointments,
-      totalEarnings : totalEarning,
-      totalPatients : totalPatients,
+      totalAppointments: totalAppointments,
+      totalEarnings: totalEarning,
+      totalPatients: totalPatients,
     };
   }
+
+  async getfetchUpcomingAppointmentOverview(doctorId: string):Promise<UpcomingAppointmentOverView[]> {
+    try {
+      const parsedDoctorId = new ObjectId(doctorId);
+  
+      // Find the doctor by ID
+      const doctor = await this.doctorModel.findById(parsedDoctorId).exec();
+      
+      if (doctor) {
+        // Find upcoming appointments for the doctor
+        const appointments = await this.appointmentModel.find({
+          doctorId: parsedDoctorId,
+          consultaionStatus: 'upcoming',
+        })
+          .populate({
+            path: 'patientId',   
+            select: 'firstName lastName profileImage'  
+          })
+          .populate('doctorId')
+          .populate('slotId')
+          .limit(3) 
+          .exec();
+        const upcomingAppointmentOverview = appointments.map(appointment => ({
+          ProfileImage: appointment.patientId['profileImage'],
+          consultationType:appointment.consultationType,
+          firstName: `${appointment.patientId['firstName']}`,
+          lastName: `${appointment.patientId['lastName']}`,  
+          day: appointment.slotId.day,  
+          Time: appointment.slotId.startTime 
+        }));
+  
+        return upcomingAppointmentOverview
+        
+      } else {
+        throw new Error('Doctor not found');
+      }
+    } catch (error) {
+      console.error("Error fetching upcoming appointment overview: ", error);
+      throw new Error("Could not fetch upcoming appointment overview");
+    }
+  }
+  
+  
   async loadDoctorData(doctorId: string): Promise<doctorrequestsResponseDto> {
     try {
       const parsedDoctorId = new ObjectId(doctorId);
-      console.log('gfdhcbjdefbcvhjdebvc///',parsedDoctorId)
+      console.log('gfdhcbjdefbcvhjdebvc///', parsedDoctorId);
       const Doctor = await this.doctorModel
         .findOne({ _id: parsedDoctorId })
         .exec();
-        console.log('Doctor',Doctor)
+      console.log('Doctor', Doctor);
       return {
         success: true,
         message: 'Doctor registered successfully',
@@ -156,6 +213,7 @@ export class DoctorService {
             specialisedDepartment:
               Doctor.professionalDetails.specialisedDepartment,
             bio: Doctor.professionalDetails.bio,
+            MedicalDocument:Doctor.professionalDetails.MedicalDocument,
             totalExperience: Doctor.professionalDetails.totalExperience,
             patientsPerDay: Doctor.professionalDetails.patientsPerDay,
             consultationFee: Doctor.professionalDetails.consultationFee,
@@ -169,18 +227,95 @@ export class DoctorService {
     }
   }
 
-  async getAppointmentsByDoctorAndStatus(doctorId: string, status: string): Promise<Appointment[]> {
+  async getAppointmentsByDoctorAndStatus(
+    doctorId: string,
+    status: string,
+    currentPage:number,
+    limit:number
+  ): Promise<AppointmentResponse | InternalServerErrorException> {
+    try {
+      console.log('doctorId',doctorId)
+      console.log('status////',status)
+      const parsedId = new ObjectId(doctorId);
+    const skip = (currentPage - 1) * limit;
+    const appointments = await this.appointmentModel
+      .find({ doctorId: parsedId, consultaionStatus: status })
+      .populate('doctorId')
+      .populate('patientId')
+      .populate('slotId')
+      .skip(skip)
+      .limit(limit)
+      .exec();
+ console.log("Lengthddd",appointments.length)
 
-    const parsedId=new ObjectId(doctorId)
+      const totalAppointmentcount=await this.appointmentModel.countDocuments({doctorId:parsedId,consultaionStatus: status})
 
-    const appointments = await this.appointmentModel.find({doctorId: parsedId,consultaionStatus:status})
-    .populate('doctorId')
-    .populate('patientId')
-    .populate('slotId')
-    .exec();
-    return appointments;
+
+      const totalPages = Math.ceil(totalAppointmentcount / limit);
+      console.log(totalAppointmentcount)
+      console.log(totalPages)
+      console.log(currentPage);
+      ;
+      
+      return {
+      appointments:appointments,
+      totalAppointmentcount,
+      totalPages,
+      currentPage,
+      
+    } 
+  }catch (error) {
+    console.log(error)
+    return new InternalServerErrorException(
+      'Internal Server Error,Try Again',
+    );
+      
   }
+    
+
+
+  }
+
+
+  async fetchMypatients(doctorId: string, currentPage: number, limit: number) {
+    try {
+      const parsedId = new ObjectId(doctorId);
+      const skip = (currentPage - 1) * limit;
   
+     
+      const uniquePatientIds = await this.appointmentModel.distinct('patientId', {
+        doctorId: parsedId,
+      });
+      const totalPatientsCount=uniquePatientIds.length
+  
+      console.log('limit///',limit)
+      console.log('Unique Patient IDs:', uniquePatientIds);
+      const totalPages = Math.ceil(totalPatientsCount / limit);
+      console.log('totalPatientsCount//',totalPatientsCount)
+      console.log('totalPages//',totalPages)
+      const patients = await this.userModel.find({
+        _id: { $in: uniquePatientIds },
+      })
+      .skip(skip)
+      .limit(limit);
+
+      return {
+        patients,
+        totalPatientsCount,
+        totalPages,
+        currentPage
+      }
+  
+      
+    } catch (error) {
+      return new InternalServerErrorException(
+        'Internal Server Error, Try Again',
+      );
+      
+      
+    }
+
+  }
 
   async changePassword(body: {
     oldPassword: string;
@@ -229,43 +364,360 @@ export class DoctorService {
     }
   }
 
-  async CreateDoctor(
-    registerDoctorDto: combinedInterface,
-  ): Promise<doctorrequestsResponseDto> {
+
+  async updatepersonalDetailes(editedpersonalDetails: personalDetails, DoctorId: string) {
     try {
-      const { email, password, ...otherPersonalDetails } =
-        registerDoctorDto.personalDetails;
-
-      const existingDoctor = await this.doctorModel
-        .findOne({ 'personalDetails.email': email })
-        .exec();
-
+      const parsedDoctorId = new ObjectId(DoctorId);
+      console.log()
+  
+     
+      const existingDoctor = await this.doctorModel.findById(parsedDoctorId);
+  
       if (!existingDoctor) {
+        return {
+          success: false,
+          message: 'Doctor not found'
+        };
+      }
+  
+      console.log('editedpersonalDetails????',editedpersonalDetails)
+      const updatedPersonalDetails = {
+        ...existingDoctor.personalDetails,
+        ...editedpersonalDetails,  
+      };
+     
+  
+    
+      await this.doctorModel.findOneAndUpdate(
+        { _id: parsedDoctorId }, 
+        { $set: { personalDetails: updatedPersonalDetails } }, 
+        { new: true }  
+      );
+  
+      return {
+        success: true,
+        message: 'Personal Details Updated Successfully',
+      };
+  
+    } catch (error) {
+      console.error("Error updating personal details: ", error);
+      throw new Error("Could not update personal details");
+    }
+  }
+  
+  
+  async updategeneralDetailes(editedGeneralDetails: generalDetails, DoctorId: string) {
+    try {
+      const parsedDoctorId = new ObjectId(DoctorId);
+      
+   
+      const existingDoctor = await this.doctorModel.findById(parsedDoctorId);
+    
+      if (!existingDoctor) {
+        return {
+          success: false,
+          message: 'Doctor not found',
+        };
+      }
+  
+     
+      const mergedGeneralDetails = {
+        ...existingDoctor.generalDetails,
+        ...editedGeneralDetails
+      };
+  
+      // Check if any changes have been made
+      const isUnchanged = JSON.stringify(existingDoctor.generalDetails) === JSON.stringify(mergedGeneralDetails);
+  
+      if (isUnchanged) {
+        return {
+          success: true,
+          message: 'No changes were made to the general details',
+        };
+      }
+  
+    
+      const updatedDoctor = await this.doctorModel.findOneAndUpdate(
+        { _id: parsedDoctorId }, 
+        { $set: { generalDetails: mergedGeneralDetails } }, 
+        { new: true } // Return the updated document
+      );
+  
+      return {
+        success: true,
+        message: 'General details updated successfully',
+        updatedDoctor,
+      };
+  
+    } catch (error) {
+      console.error("Error updating general details: ", error);
+      throw new Error("Could not update general details");
+    }
+  }
+
+  async updateProfessionalDetails(editedProfessionalDetails:professionalDetails,DoctorId:string){
+    try {
+      const parsedDoctorId = new ObjectId(DoctorId);
+      
+   
+      const existingDoctor = await this.doctorModel.findById(parsedDoctorId);
+    
+      if (!existingDoctor) {
+        return {
+          success: false,
+          message: 'Doctor not found',
+        };
+      }
+  
+     
+      const mergedProfessionalDetails = {
+        ...existingDoctor.professionalDetails,
+        ...editedProfessionalDetails
+      };
+  
+      // Check if any changes have been made
+      const isUnchanged = JSON.stringify(existingDoctor.professionalDetails) === JSON.stringify(mergedProfessionalDetails);
+  
+      if (isUnchanged) {
+        return {
+          success: true,
+          message: 'No changes were made to the general details',
+        };
+      }
+  
+      // Update only the changed fields in generalDetails
+      const updatedDoctor = await this.doctorModel.findOneAndUpdate(
+        { _id: parsedDoctorId }, 
+        { $set: { professionalDetails: mergedProfessionalDetails } }, 
+        { new: true } 
+      );
+  
+      return {
+        success: true,
+        message: 'Professional details updated successfully',
+        updatedDoctor,
+      };
+  
+      
+      
+    } catch (error) {
+      
+    }
+  }
+  
+  async uploadProfileImage(
+    file:Express.Multer.File,
+    DoctorId:string
+  ):Promise<commonResponse>{
+    const parsedDoctorId = new ObjectId(DoctorId);
+try {
+  if(parsedDoctorId){
+    const Doctor=await this.doctorModel.findById({_id:parsedDoctorId}).exec()
+    if(Doctor){
+      const response = await this.cloudinaryService.uploadFile(file);
+      Doctor.personalDetails.profileImage=response.url
+      await Doctor.save()
+      return {
+        success: true,
+        message: 'Profile image uploaded successfully',
+      };
+
+    }else{
+      return {
+        success: false,
+        message: 'Invalid User ID',
+      };
+
+    }
+  }
+} catch (error) {
+  console.error('Error uploading profile image:', error);
+      return {
+        success: false,
+        message: 'Error uploading profile image',
+      };
+  
+}
+   
+  }
+
+
+  async fetchDepartments(): Promise<string[]> {
+    try {
+      const departments = await this.SpecialityModel.find().exec();
+      return departments.map(department => department.specialityName);
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to fetch departments.');
+    }
+  }
+  async fetchTransactions(doctorId: string,currentPage,limit){
+    try {
+
+      if (!doctorId || !ObjectId.isValid(doctorId)) {
+        throw new Error('Invalid doctorId');
+      }
+      const parsedDoctorId = new ObjectId(doctorId);
+  
+      const skip = (currentPage - 1) * limit;
+      const appointmentDetails = await this.appointmentModel
+        .find({ doctorId: parsedDoctorId })
+        .populate('patientId')
+        .skip(skip)
+        .limit(limit)
+
+      const totalAppointmentcount=await this.appointmentModel.countDocuments({
+        doctorId: parsedDoctorId
+      })
+      const totalPages = Math.ceil(totalAppointmentcount / limit);
+  
+
+      const transactions = appointmentDetails.map(appointment => ({
+        _id: appointment._id.toString(), 
+        patientId:appointment.patientId,
+        consultationType: appointment.consultationType,
+        consultationStatus: appointment.consultaionStatus,
+        isCancelledbypatient: appointment.isCancelledbypatient,
+        iscancelledbyDoctor: appointment.iscancelledbyDoctor,
+        PaymentMethod: appointment.PaymentMethod,
+        paymentStatus: appointment.paymentStatus,
+        amount: appointment.totalAmount, 
+      }));
+     console.log(transactions)
+      return{
+        transactions,
+        totalAppointmentcount,
+        totalPages,
+        currentPage,
+      } 
+  
+    } catch (error) {
+      console.error('Error fetching transactions:', error.message); 
+      throw new Error('Failed to fetch transactions');
+    }
+  }
+
+
+  async fetchSearchResults(searchTerm: string, doctorId: string, currentPage: number, limit: number) {
+    try {
+      const parsedDoctorId = new ObjectId(doctorId);
+  
+      const skip = (currentPage - 1) * limit;
+  
+      // Fetch all transactions by doctorId and populate patient details
+      const allTransactions = await this.appointmentModel.find({
+        doctorId: parsedDoctorId,
+      }).populate('patientId', 'firstName lastName profileImage');
+  
+      // Convert the searchTerm to lowercase for case-insensitive comparison
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+  
+      // Filter the transactions based on the search term
+      const filteredTransactions = allTransactions.filter((appointment) => {
+        const patientFirstName = appointment.patientId['firstName'];
+        const patientLastName = appointment.patientId['lastName'];
+        const consultationStatus = appointment.consultaionStatus;
+        const consultationType = appointment.consultationType;
+  
+        // Check if any of the fields include the search term
+        return (
+          patientFirstName.toLowerCase().includes(lowerCaseSearchTerm) ||
+          patientLastName.toLowerCase().includes(lowerCaseSearchTerm) ||
+          consultationStatus.toLowerCase().includes(lowerCaseSearchTerm) ||
+          consultationType.toLowerCase().includes(lowerCaseSearchTerm)
+        );
+      });
+  
+      // Apply pagination to the filtered transactions
+      const paginatedTransactions = filteredTransactions.slice(skip, skip + limit);
+      const totalFilteredCount = filteredTransactions.length;
+      const totalPages = Math.ceil(totalFilteredCount / limit);
+  
+      const transactions = paginatedTransactions.map(appointment => ({
+        _id: appointment._id.toString(),
+        patientId: appointment.patientId,
+        consultationType: appointment.consultationType,
+        consultationStatus: appointment.consultaionStatus,
+        isCancelledbypatient: appointment.isCancelledbypatient,
+        iscancelledbyDoctor: appointment.iscancelledbyDoctor,
+        PaymentMethod: appointment.PaymentMethod,
+        paymentStatus: appointment.paymentStatus,
+        amount: appointment.totalAmount,
+      }));
+  
+      return {
+        transactions,
+        totalAppointmentcount: totalFilteredCount,
+        totalPages,
+        currentPage,
+      };
+    } catch (error) {
+      console.error('Error fetching search results:', error.message);
+      throw new Error('Failed to fetch search results');
+    }
+  }
+  
+  
+  
+  
+  
+  
+
+  
+    async CreateDoctor(
+      registerDoctorDto: combinedInterface,
+      file: Express.Multer.File
+    ): Promise<doctorrequestsResponseDto> {
+      try {
+        const { email, password, ...otherPersonalDetails } = registerDoctorDto.personalDetails;
+  
+        // Check if password is provided
+        if (!password) {
+          throw new Error('Password is missing or undefined');
+        }
+        console.log('Password:', password); // Log for debugging
+  
+        // Check for existing doctor
+        const existingDoctor = await this.doctorModel
+          .findOne({ 'personalDetails.email': email })
+          .exec();
+  
+        if (existingDoctor) {
+          return {
+            success: false,
+            message: 'Doctor already exists. Please log in.',
+          };
+        }
+  
+        // Hash password
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
-
+        console.log('Hashed password:', hashedPassword); // Log hashed password
+  
+        // Upload document to Cloudinary
+        const uploadedFile = await this.cloudinaryService.uploadFile(file);
+        const MedicalDocument = uploadedFile.url;
+  
+        // Create new doctor document
         const newDoctor = new this.doctorModel({
           personalDetails: {
             ...otherPersonalDetails,
-            email: email,
+            email,
             role: 'Doctor',
             password: hashedPassword,
           },
           generalDetails: registerDoctorDto.generalDetails,
-          professionalDetails: registerDoctorDto.professionalDetails,
+          professionalDetails: {
+            ...registerDoctorDto.professionalDetails,
+            MedicalDocument,
+          },
         });
-
+  
         await newDoctor.save();
-
-        const content =
-          'Wlcome to the Doccure Care Service you will get an E-mail After You verified ';
-        await this.mailservice.sendWelcomeEmail(
-          email,
-          otherPersonalDetails.lastName,
-          content,
-        );
-
-        // Return response according to createDoctorDto
+  
+        // Send welcome email
+        const content = 'Welcome to Doccure Care Service. You will receive an email after verification.';
+        await this.mailservice.sendWelcomeEmail(email, otherPersonalDetails.lastName, content);
+  
         return {
           success: true,
           message: 'Doctor registered successfully',
@@ -276,18 +728,16 @@ export class DoctorService {
             professionalDetails: newDoctor.professionalDetails,
           },
         };
-      } else {
-        return {
-          success: false,
-          message: 'Doctor already exists Please login',
-        };
+      } catch (error) {
+        console.error('Error creating doctor:', error);
+        throw new InternalServerErrorException('Internal Server Error. Please try again.');
       }
-    } catch (error) {
-      return new InternalServerErrorException(
-        'Internal Server Error,Try Again',
-      );
     }
-  }
+  
+  
+  
+  
+
 
   async findByEmail(email: string): Promise<any | null> {
     try {
@@ -304,12 +754,12 @@ export class DoctorService {
   ): Promise<doctorrequestsResponseDto> {
     try {
       const { email, password } = loginDatas;
-  
+
       // Find the doctor by email
       const existingDoctor = await this.doctorModel
         .findOne({ 'personalDetails.email': email })
         .exec();
-  
+
       // Check if the doctor exists
       if (!existingDoctor) {
         return {
@@ -317,7 +767,7 @@ export class DoctorService {
           message: 'Doctor is not registered, please register',
         };
       }
-  
+
       // Check if registration is cancelled
       if (existingDoctor.personalDetails.isRegcancelled) {
         return {
@@ -325,7 +775,7 @@ export class DoctorService {
           message: `Unfortunately, your registration was cancelled by Admin: ${existingDoctor.personalDetails.regCancelreason}`,
         };
       }
-  
+
       // Check if the doctor is approved
       if (!existingDoctor.personalDetails.isApproved) {
         return {
@@ -333,13 +783,13 @@ export class DoctorService {
           message: 'You are not approved yet.',
         };
       }
-  
+
       // Compare passwords
       const passwordMatch = await bcrypt.compare(
         password,
         existingDoctor.personalDetails.password,
       );
-  
+
       // Check if the password matches
       if (!passwordMatch) {
         return {
@@ -347,19 +797,19 @@ export class DoctorService {
           message: 'Invalid credentials, please try again',
         };
       }
-  
+
       // Create JWT payload
       const payload = {
         userId: existingDoctor._id.toString(),
         email: existingDoctor.personalDetails.email,
         role: existingDoctor.personalDetails.role,
       };
-  
+
       // Sign the token
       const token = this._jwtService.sign(payload);
-  
+
       const { lastName } = existingDoctor.personalDetails;
-  
+
       return {
         success: true,
         message: `${lastName} logged in successfully`,
@@ -371,13 +821,14 @@ export class DoctorService {
         },
         Token: token,
       };
-  
     } catch (error) {
       console.error('Error during doctor login:', error); // Log the error for debugging
-      throw new InternalServerErrorException('Internal Server Error, please try again');
+      throw new InternalServerErrorException(
+        'Internal Server Error, please try again',
+      );
     }
   }
-  
+
   async createAvailableTime(
     availableTimeData: AvailableTimeInterface,
   ): Promise<AvailableTimeResponse | InternalServerErrorException> {
@@ -549,39 +1000,39 @@ export class DoctorService {
     }
   }
 
-  async uploadProfile(secure_url, doctorId) {
-    try {
-      const ExistingDoctor = await this.doctorModel
-        .findOne({ _id: doctorId })
-        .exec();
-
-      if (ExistingDoctor) {
-        ExistingDoctor.personalDetails.profileImage = secure_url;
-
-        await ExistingDoctor.save();
-        console.log('ExistingDoctor\\\\\\\\', ExistingDoctor);
-        return {
-          succes: true,
-          message: 'Profile Updated Succefuly',
-        };
-      }
-    } catch (error) {}
-  }
+ 
 
   async getAppointments(
     DoctorId: string,
-  ): Promise<Appointment[] | InternalServerErrorException> {
+    currentPage: number,
+    limit: number,
+  ): Promise<AppointmentResponse | InternalServerErrorException> {
     try {
-      console.log("/////////////////////////////////////")
+
       const parsedDoctorId = new ObjectId(DoctorId);
-     console.log('parsedDoctorId////',parsedDoctorId)
-      const result = await this.appointmentModel
+      const skip = (currentPage - 1) * limit;
+      const totalAppointments = await this.appointmentModel
         .find({ doctorId: parsedDoctorId })
         .populate('doctorId')
         .populate('patientId')
-        .populate('slotId');
+        .populate('slotId')
+        .skip(skip)
+        .limit(limit)
+        const totalAppointmentcount=await this.appointmentModel.countDocuments({doctorId:parsedDoctorId})
+       
+        const totalPages = Math.ceil(totalAppointmentcount / limit);
+        console.log('totalAppointments?>././.',totalAppointments)
+      return {
+        appointments:totalAppointments,
+        totalAppointmentcount,
+        totalPages,
+        currentPage,
+       
 
-      return result as Appointment[];
+        
+
+
+      }
     } catch (error) {
       return new InternalServerErrorException(
         'Internal Server Error,Try Again',

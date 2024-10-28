@@ -13,6 +13,8 @@ import { WalletSchema } from 'src/Users/Schema/Wallet.schema';
 import { UserModule } from 'src/Users/user.Module';
 import { JwtMiddleware } from 'src/middlewares/auth.middlware';
 import { UserSchema } from 'src/Users/Schema/user.Schema';
+import { specialityScheama } from 'src/Admin/Schema/speciality.schema';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 
 @Module({
@@ -23,6 +25,7 @@ import { UserSchema } from 'src/Users/Schema/user.Schema';
     MongooseModule.forFeature([{ name: 'Appointment', schema: AppointmentSchema }]),
     MongooseModule.forFeature([{name:'wallet',schema:WalletSchema}]),
     MongooseModule.forFeature([{ name:'User', schema: UserSchema }]),
+    MongooseModule.forFeature([{name:'speciality',schema:specialityScheama}]),
     UserModule,
    
     ConfigModule.forRoot({
@@ -34,18 +37,21 @@ import { UserSchema } from 'src/Users/Schema/user.Schema';
       signOptions: { expiresIn: '2d' },
     }),
   ],
-  providers: [DoctorService],
+  providers: [DoctorService,CloudinaryService],
   controllers: [DoctorController],
 })
 export class DoctorModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
 
+    
       .apply(JwtMiddleware)
       .exclude(
         { path: 'Doctors/Doctor-login', method: RequestMethod.POST },
+        {path:'Doctors/fetchDepartments',method:RequestMethod.GET},
         { path: 'Doctors/Doctor-Register', method: RequestMethod.POST },
         { path: 'Doctors/loadDoctorDatas', method: RequestMethod.GET },
+       
       )
       .forRoutes(DoctorController)
     

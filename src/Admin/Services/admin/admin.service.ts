@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -20,13 +21,18 @@ import {
 import {
   Category,
   categoryResponse,
+  DoctorRequest,
+  fetchDoctorRequestOverview,
   loadAllcategories,
 } from 'src/Admin/interfaces/interface';
 import { ContactDocument } from 'src/Users/Schema/contactUs.schema';
+import { Appointment } from 'src/Users/Schema/Appointment.Schema';
 
 @Injectable()
 export class AdminService {
   constructor(
+    @InjectModel('Appointment')
+    private readonly appointmentModel: Model<Appointment>,
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Doctor') private DoctorModel: Model<DoctorModel>,
     @InjectModel(Admin.name) private AdminModel: Model<AdminDocument>,
@@ -152,6 +158,46 @@ export class AdminService {
       );
     }
   }
+  async fetchAllPatients(currentPage: number, limit: number) {
+    try {
+      const skip = (currentPage - 1) * limit;
+      const result = await this.userModel.find().skip(skip).limit(limit).exec();
+      const totalPatientsCount = await this.userModel.countDocuments();
+      const totalPages = Math.ceil(totalPatientsCount / limit);
+      return {
+        result,
+        totalPatientsCount,
+        totalPages,
+        currentPage,
+      };
+    } catch (error) {
+      return new InternalServerErrorException(
+        'Internal Server Error,Try Again',
+      );
+    }
+  }
+  async getallDoctors(currentPage: number, limit: number) {
+    try {
+      const skip = (currentPage - 1) * limit;
+      const Doctors = await this.DoctorModel.find()
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      const totalDoctorsCount = await this.DoctorModel.countDocuments();
+      const totalPages = Math.ceil(totalDoctorsCount / limit);
+      return {
+        Doctors,
+        totalDoctorsCount,
+        totalPages,
+        currentPage,
+      };
+    } catch (error) {
+      return new InternalServerErrorException(
+        'Internal Server Error,Try Again',
+      );
+    }
+  }
 
   async getDoctorRequests(): Promise<
     combinedInterface[] | InternalServerErrorException
@@ -190,6 +236,7 @@ export class AdminService {
             specialisedDepartment:
               doctor.professionalDetails.specialisedDepartment,
             bio: doctor.professionalDetails.bio,
+            MedicalDocument: doctor.professionalDetails.MedicalDocument,
             totalExperience: doctor.professionalDetails.totalExperience,
             patientsPerDay: doctor.professionalDetails.patientsPerDay,
             consultationFee: doctor.professionalDetails.consultationFee,
@@ -205,11 +252,44 @@ export class AdminService {
     }
   }
 
+  async getallAppointments(currentPage, limit) {
+    try {
+      const skip = (currentPage - 1) * limit;
+      const appointments = await this.appointmentModel
+        .find()
+        .populate('patientId')
+        .populate('doctorId')
+        .populate('patientId')
+        .populate('slotId')
+        .skip(skip)
+        .limit(limit)
+        .exec();
+
+      const totalAppointmentcount =
+        await this.appointmentModel.countDocuments();
+      const totalPages = Math.ceil(totalAppointmentcount / limit);
+      return {
+        appointments: appointments,
+        totalAppointmentcount,
+        totalPages,
+        currentPage,
+      };
+    } catch (error) {
+      console.log(error);
+      return new InternalServerErrorException(
+        'Internal Server Error,Try Again',
+      );
+    }
+  }
+
   async acceptRequest(acceptRequestDto): Promise<doctorrequestsResponseDto> {
     try {
       const { id } = acceptRequestDto;
+
+      console.log(id);
       const doctor = await this.DoctorModel.findById(id).exec();
       if (doctor) {
+        console.log('doctor', doctor);
         doctor.personalDetails.isApproved = true;
         await doctor.save();
 
@@ -381,6 +461,79 @@ export class AdminService {
         success: false,
         message: 'Error fetching categories',
         catogories: [],
+      };
+    }
+  }
+
+  async fetchDoctorRequestOverview(): Promise<fetchDoctorRequestOverview> {
+    try {
+      const doctors = await this.DoctorModel.find({
+        'personalDetails.isApproved': false,
+      }).exec();
+      console.log('doctors', doctors);
+
+      if (doctors && doctors.length > 0) {
+        const doctorRequests: DoctorRequest[] = doctors.map((doctor) => ({
+          firstName: doctor.personalDetails.firstName,
+          lastName: doctor.personalDetails.lastName,
+          profileImage: doctor.personalDetails.profileImage,
+          department: doctor.professionalDetails.specialisedDepartment,
+          experience: doctor.professionalDetails.totalExperience,
+        }));
+
+        return {
+          doctorRequests,
+        };
+      }
+
+      // Return empty array if no doctors found
+      return {
+        doctorRequests: [],
+      };
+    } catch (error) {
+      console.error('Error fetching doctor requests:', error);
+      throw new Error('Failed to fetch doctor requests');
+    }
+  }
+
+  async updateSpeciality(
+    categoryName: string,
+    categoryDescription: string,
+    categoryId: string,
+  ): Promise<commonResponse> {
+    try {
+      const parsedId = new ObjectId(categoryId);
+
+      // Find the speciality by ID
+      const speciality = await this.SpecialityModel.findById(parsedId);
+
+      if (!speciality) {
+        return {
+          success: false,
+          message: 'Speciality not found',
+        };
+      }
+
+      // Update speciality details if provided
+      // If categoryName is provided, update it, otherwise keep the existing value
+      speciality.specialityName = categoryName || speciality.specialityName;
+
+      // If categoryDescription is provided, update it, otherwise keep the existing value
+      speciality.specialityDescription =
+        categoryDescription || speciality.specialityDescription;
+
+      // Save updated speciality
+      await speciality.save();
+
+      return {
+        success: true,
+        message: 'Speciality updated successfully',
+      };
+    } catch (error) {
+      console.error('Error updating speciality:', error);
+      return {
+        success: false,
+        message: 'An error occurred while updating the speciality',
       };
     }
   }

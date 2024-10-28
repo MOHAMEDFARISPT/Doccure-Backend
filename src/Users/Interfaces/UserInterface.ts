@@ -15,7 +15,15 @@ export interface User  {
     createdAt?: Date;
     updatedAt?: Date;
     isGoogle:boolean;
-    isBlocked:boolean
+    isBlocked:boolean;
+
+  }
+
+  export interface fetchAllPatient{
+    users:User[]
+    totalDoctorsCount:number;
+    totalPages:number;
+    currentPage:number;
 
   }
 
@@ -60,6 +68,7 @@ export interface userdataResponseinterface{
   email?:string;
   profileImage?:string;
   accessToken?:string;
+  refreshToken?:string;
 }
 
 export interface createUserResponse extends  commonResponse{
@@ -120,10 +129,14 @@ export interface Appointmentcreation {
     _id:string;        
     userId?:string;        
     balance: number;              
-    transactions: Transaction[];   
+    transactions: Transaction[]; 
+    totalTransactions?:number, 
+    currentPage?:number,
+    totalPages?:number,
     createdAt?: Date;              
     updatedAt?: Date;             
   }
+
 
   export interface personalDetails {
     firstName: string;
@@ -193,6 +206,15 @@ export interface Appointmentcreation {
     isCancelledbypatient: boolean;
     cancellationReason?: string;
     __v: number;
+  }
+
+  export interface AppointmentResponse{
+    appointments:Appointment[]
+    totalAppointmentcount:number,
+    totalPages:number,
+    currentPage:number
+
+
   }
 
   

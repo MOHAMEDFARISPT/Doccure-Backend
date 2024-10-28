@@ -55,7 +55,7 @@ export const AppointmentSchema = new Schema<Appointment>({
   consultaionStatus:{
     type:String,
     default:'upcoming',
-     enum:['upcoming','cancelled','compleated']
+     enum:['upcoming','cancelled','completed']
 
   },
   iscancelledbyDoctor: {

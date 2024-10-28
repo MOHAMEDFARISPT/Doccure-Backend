@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/ban-types */
 /* eslint-disable prettier/prettier */
 
+import { ObjectId } from "mongoose";
+
+
 
 
 
@@ -13,13 +16,42 @@ export interface doctorLogin{
   
   
   
+  export interface DoctorResponse {
+    doctors: combinedInterface[];     
+    totalDoctorsCount: number; 
+    totalPages: number;         
+    currentPage: number;       
+  }
+
+
+  export interface TransactionDetails {
+    _id: string; 
+    patientId: string | { 
+      firstName: string;
+      profileImage: string;
+    };
+    consultationType: string;
+    consultationStatus: string;
+    isCancelledbypatient: boolean;
+    iscancelledbyDoctor: boolean;
+    PaymentMethod: string;
+    paymentStatus: string;
+    amount: number;
+  }
+  export interface TransactionResponse {
+    transactions: TransactionDetails[]; 
+    totalAppointmentcount: number; 
+    totalPages: number; 
+    currentPage: number; 
+  }
   
   
+
   
   
   
   export interface responseData {
-    _id?: string;
+    _id?: ObjectId;
     personalDetails?: personalDetails;
     generalDetails?: generalDetails;
     professionalDetails?: professionalDetails;
@@ -55,6 +87,7 @@ export interface doctorLogin{
     specialisedDepartment: string;
     bio:string;
     totalExperience: number;
+    MedicalDocument: string;
     patientsPerDay: number;
     consultationFee: number;
   }
@@ -63,7 +96,8 @@ export interface doctorLogin{
     _id?:string,
     personalDetails:personalDetails,
     generalDetails:generalDetails,
-    professionalDetails:professionalDetails
+    professionalDetails:professionalDetails,
+
   
   }
   export interface DoctorStatistics {
@@ -80,6 +114,7 @@ export interface doctorLogin{
     message?: string;
      data?:combinedInterface | combinedInterface[]
      Token?: string; 
+     refreshToken?:string;
   }
   
 
@@ -106,6 +141,16 @@ export interface doctorLogin{
     success: boolean;
     message: string;
   }
+
+   
+export interface UpcomingAppointmentOverView{
+  ProfileImage:string;
+  consultationType:string;
+  firstName:string;
+  lastName:string;
+  day:string;
+  Time:string;
+}
 
 
   

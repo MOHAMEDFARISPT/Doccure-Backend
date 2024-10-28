@@ -53,6 +53,9 @@ export class UserModule implements NestModule {
         {path:'users/resendOtp',method:RequestMethod.POST}
       )
       .forRoutes(UserController); 
+      // consumer
+      // .apply(BlockUserMiddleware)
+      // .forRoutes(UserController); 
   }
  
 

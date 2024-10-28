@@ -16,3 +16,15 @@ export interface loadAllcategories {
   success?: boolean;
   message?: string;
 }
+
+export interface DoctorRequest {
+  firstName: string;
+  lastName: string;
+  profileImage: string;
+  department: string;
+  experience: number;
+}
+
+export interface fetchDoctorRequestOverview {
+  doctorRequests: DoctorRequest[];
+}

@@ -14,6 +14,7 @@ import { specialityScheama } from "./Schema/speciality.schema";
 import { JwtMiddleware } from "src/middlewares/auth.middlware";
 import { UserModule } from "src/Users/user.Module";
 import { ContactFormSchema } from "src/Users/Schema/contactUs.schema";
+import { AppointmentSchema } from "src/Users/Schema/Appointment.Schema";
 
 
 
@@ -27,6 +28,7 @@ import { ContactFormSchema } from "src/Users/Schema/contactUs.schema";
         { name: 'Admin', schema: AdminSchema },
         {name:'speciality',schema:specialityScheama},
       { name: 'contactForm', schema: ContactFormSchema },
+      { name: 'Appointment', schema: AppointmentSchema },
       ]),
       UserModule,
       ConfigModule.forRoot({

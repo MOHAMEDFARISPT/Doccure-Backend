@@ -25,6 +25,7 @@ import { MailService } from 'src/mail/mail.service';
 import {
   AvailableTimeInterface,
   AvailableTimeResponse,
+  doctorrequestsResponseDto,
   Slot,
 } from 'src/Doctors/interfaces/DoctorInterface';
 import { Wallet } from '../Schema/Wallet.schema';
@@ -124,24 +125,62 @@ export class UserService {
       data: {
         _id: userId,
         accessToken: jwtToken,
+        refreshToken: '',
       },
     };
   }
   async findDoctorsByGenders(genders: string[]): Promise<DoctorModel[]> {
     const result = await this.doctorModel
-      .find({ 'personalDetails.gender': { $in: genders } })
+      .find({
+        'personalDetails.isApproved': true,
+        'personalDetails.isRegcancelled': false,
+        'personalDetails.isBlocked': false,
+        'personalDetails.gender': { $in: genders },
+      })
+
       .exec();
 
     console.log('heelooo', result);
     return result;
   }
 
-  async getAllDoctors(): Promise<DoctorModel[] | InternalServerErrorException> {
+  async getAllDoctors(
+    currentPage: number,
+    limit: number,
+  ): Promise<any | InternalServerErrorException> {
     try {
-      const doctors = await this.doctorModel.find().exec();
-      return doctors;
+      const skip = (currentPage - 1) * limit;
+      const [doctors, totalDoctorsCount] = await Promise.all([
+        this.doctorModel
+          .find({
+            'personalDetails.isApproved': true,
+            'personalDetails.isBlocked': false,
+            'personalDetails.isRegcancelled': false,
+          })
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        this.doctorModel.countDocuments({
+          'personalDetails.isApproved': true,
+          'personalDetails.isBlocked': false,
+          'personalDetails.isRegcancelled': false,
+        }),
+      ]);
+      console.log('doctors>???', doctors);
+
+      console.log('totalPage', Math.ceil(totalDoctorsCount / limit));
+      console.log('totalDoctorsCount', totalDoctorsCount);
+
+      const totalPages = Math.ceil(totalDoctorsCount / limit);
+
+      return {
+        doctors,
+        totalDoctorsCount,
+        totalPages,
+        currentPage,
+      };
     } catch (error) {
-      return new InternalServerErrorException(
+      throw new InternalServerErrorException(
         'Internal Server Error. Try Again',
       );
     }
@@ -153,15 +192,24 @@ export class UserService {
       const experienceRange: number[] =
         this.parseExperienceRange(selectedExperience);
 
-      // Fetching all doctors
-      const doctors = await this.doctorModel.find().exec();
+      // Fetching all doctors that are approved and not cancelled
+      const doctors = await this.doctorModel
+        .find({
+          'personalDetails.isApproved': true,
+          'personalDetails.isBlocked': false,
+          'personalDetails.isRegcancelled': false,
+        })
+        .exec();
 
-      // Filtering doctors based on totalExperience
+      // Filtering doctors based on the experience range
       const filteredDoctors = doctors.filter(
         (doctor) =>
           doctor.professionalDetails.totalExperience >= experienceRange[0] &&
-          doctor.professionalDetails.totalExperience <= experienceRange[1],
+          (experienceRange[1] === Infinity ||
+            doctor.professionalDetails.totalExperience <= experienceRange[1]),
       );
+      console.log('filteredDoctors///????', filteredDoctors);
+
       return filteredDoctors;
     } catch (error) {
       throw new InternalServerErrorException(
@@ -184,6 +232,9 @@ export class UserService {
     try {
       const doctors = await this.doctorModel.find({
         'professionalDetails.specialisedDepartment': selectedDepartment,
+        'personalDetails.isApproved': true,
+        'personalDetails.isBlocked': false,
+        'personalDetails.isRegcancelled': false,
       });
 
       return doctors;
@@ -196,6 +247,9 @@ export class UserService {
   async searchDoctors(searchTerm: string): Promise<DoctorModel[]> {
     try {
       const doctors = await this.doctorModel.find({
+        'personalDetails.isApproved': true,
+        'personalDetails.isBlocked': false,
+        'personalDetails.isRegcancelled': false,
         $or: [
           {
             'personalDetails.firstName': { $regex: searchTerm, $options: 'i' },
@@ -557,7 +611,12 @@ export class UserService {
             email: ExistingUser.email,
             role: ExistingUser.role,
           };
-          const Token = this._jwtService.sign(payload);
+          const Token = this._jwtService.sign(payload, { expiresIn: '2d' });
+          const refreshToken = this._jwtService.sign(payload, {
+            expiresIn: '7d',
+          });
+          console.log('AccessToken', Token);
+          console.log('REfreshToken', refreshToken);
           return {
             success: true,
             message: 'Login SuccessFully',
@@ -570,6 +629,7 @@ export class UserService {
               dateOfBirth: ExistingUser.dateOfBirth,
               email: ExistingUser.email,
               accessToken: Token,
+              refreshToken: refreshToken,
             },
           };
         } else {
@@ -638,6 +698,27 @@ export class UserService {
         message: 'Error uploading profile image',
       };
     }
+  }
+  // Refresh the access token
+  async refreshAccessToken(
+    refreshToken: string,
+  ): Promise<{ accessToken: string }> {
+    const userId = this._jwtService.verify(refreshToken).userId;
+    const parsedId = new ObjectId(userId);
+    const user: User = await this.userModel.findById(parsedId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    console.log('user', user);
+
+    const payload = {
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = this._jwtService.sign(payload); // Create a new access token
+
+    return { accessToken }; // Return the new access token
   }
 
   async updateProfileDetailes(
@@ -732,12 +813,83 @@ export class UserService {
     }
   }
 
+  async fetchDoctor(doctorId: string): Promise<doctorrequestsResponseDto> {
+    try {
+      const parsedDoctorId = new ObjectId(doctorId); // Assuming doctorId is valid ObjectId
+      console.log(typeof parsedDoctorId);
+      console.log(parsedDoctorId);
+      const doctor = await this.doctorModel
+        .findById({ _id: parsedDoctorId })
+        .exec(); // Fetch doctor from DB
+
+      if (doctor) {
+        return {
+          success: true,
+          message: 'Doctor details fetched successfully',
+          data: {
+            _id: doctor._id.toString(),
+            personalDetails: {
+              firstName: doctor.personalDetails.firstName,
+              lastName: doctor.personalDetails.lastName,
+              email: doctor.personalDetails.email,
+              gender: doctor.personalDetails.gender,
+              contactNumber: doctor.personalDetails.contactNumber,
+              dateofBirth: doctor.personalDetails.dateofBirth,
+              regCancelreason: doctor.personalDetails.regCancelreason,
+              profileImage: doctor.personalDetails.profileImage,
+            },
+            generalDetails: {
+              city: doctor.generalDetails.city,
+              state: doctor.generalDetails.state,
+              country: doctor.generalDetails.country,
+              zipcode: doctor.generalDetails.zipcode,
+              adharNumber: doctor.generalDetails.adharNumber,
+            },
+            professionalDetails: {
+              medicalLicenceNumber:
+                doctor.professionalDetails.medicalLicenceNumber,
+              specialisedDepartment:
+                doctor.professionalDetails.specialisedDepartment,
+              bio: doctor.professionalDetails.bio,
+              MedicalDocument: doctor.professionalDetails.MedicalDocument,
+              totalExperience: doctor.professionalDetails.totalExperience,
+              patientsPerDay: doctor.professionalDetails.patientsPerDay,
+              consultationFee: doctor.professionalDetails.consultationFee,
+            },
+          },
+        };
+      } else {
+        // Doctor not found, return an appropriate error response
+        return {
+          success: false,
+          message: 'Doctor not found',
+          data: null,
+        };
+      }
+    } catch (error) {
+      // Handle any errors during fetching doctor details
+      return {
+        success: false,
+        message: 'An error occurred while fetching doctor details',
+        data: null,
+      };
+    }
+  }
+
   async createOrder(amount: number, currency: string) {
     const options = {
-      amount: amount, // Amount in paise
+      amount: amount * 100,
       currency: currency,
     };
-    return this.razorpay.orders.create(options);
+
+    try {
+      const order = await this.razorpay.orders.create(options);
+      console.log('Razorpay Order Created:', order);
+      return order;
+    } catch (error) {
+      console.error('Error creating Razorpay order:', error);
+      throw new Error('Error creating Razorpay order');
+    }
   }
 
   async verifyPayment(verifyPaymentDto: any) {
@@ -832,6 +984,7 @@ export class UserService {
             };
           }
         } else if (PaymentMethod === 'razorpay') {
+          console.log('Method Of Payment', PaymentMethod);
           const parsedPatientId = new Types.ObjectId(patientId);
           const parsedDoctorId = new Types.ObjectId(doctorId);
           const parsedSlotId = new Types.ObjectId(slotId);
@@ -848,12 +1001,12 @@ export class UserService {
 
           await newAppointment.save();
 
-          // Mark the slot as booked
           await this.AvailableTimeModel.findOneAndUpdate(
             { _id: parsedSlotId },
             { isBooked: true },
             { new: true },
           ).exec();
+          console.log('Slot booked successfully');
 
           return {
             success: true,
@@ -872,14 +1025,27 @@ export class UserService {
 
   async getWallet(
     userId: string,
+    currentPage: number,
+    limit: number,
   ): Promise<IWallet | InternalServerErrorException> {
     try {
+      console.log('CurrentPage', currentPage);
+
+      const skip = (currentPage - 1) * limit;
+      console.log('skip', typeof skip);
+      console.log('limit', typeof limit);
       const parsedId = new ObjectId(userId);
       const userWallet = await this.walletModel
         .findOne({ userId: parsedId })
         .exec();
+
       if (userWallet) {
-        const formattedTransactions = userWallet.transactions.map(
+        const totalTransactions = userWallet.transactions.length;
+        const paginatedTransactions = userWallet.transactions
+          .reverse()
+          .slice(skip, skip + limit);
+
+        const formattedTransactions = paginatedTransactions.map(
           (transaction) => ({
             transactionId: transaction.transactionId.toString(),
             amount: transaction.amount,
@@ -889,15 +1055,22 @@ export class UserService {
             updatedAt: transaction.updatedAt,
           }),
         );
-        console.log(userWallet);
+
+        // Calculate pagination information
+        const totalPages = Math.ceil(totalTransactions / limit);
         return {
           _id: userWallet._id.toString(),
           userId: userWallet.userId.toString(),
           balance: userWallet.balance,
-          transactions: formattedTransactions, // Add formatted transactions
+          transactions: formattedTransactions,
+          totalTransactions: totalTransactions,
+          currentPage: currentPage,
+          totalPages: totalPages,
           createdAt: userWallet.createdAt,
           updatedAt: userWallet.updatedAt,
         };
+      } else {
+        throw new InternalServerErrorException('Wallet not found');
       }
     } catch (error) {
       return new InternalServerErrorException(
@@ -906,26 +1079,66 @@ export class UserService {
     }
   }
 
+  // totalAppointments,
+  // totalAppointmentcount,
+  // totalPages,
+  // currentPage,
+
   async getAppointments(
     patientId: string,
-  ): Promise<Appointment[] | InternalServerErrorException> {
+    currentPage: number,
+    limit: number,
+    selectedStatus: string,
+  ): Promise<any> {
     try {
-      if (patientId) {
-        const parsedpatientId = new ObjectId(patientId);
-        console.log(parsedpatientId);
-        const result = await this.appointmentModel
-          .find({ patientId: parsedpatientId })
+      if (!patientId) {
+        throw new NotFoundException('Patient Not Found');
+      }
+
+      if (!ObjectId.isValid(patientId)) {
+        throw new BadRequestException('Invalid Patient ID format');
+      }
+
+      const skip = (currentPage - 1) * limit;
+
+      const status =
+        selectedStatus === 'All'
+          ? { $in: ['upcoming', 'cancelled', 'completed'] }
+          : selectedStatus;
+
+      const parsedpatientId = new ObjectId(patientId);
+
+      const [totalAppointments, totalAppointmentcount] = await Promise.all([
+        this.appointmentModel
+          .find({
+            patientId: parsedpatientId,
+            consultaionStatus: status,
+          })
           .populate('slotId')
           .populate('doctorId')
           .populate('patientId')
-          .exec();
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        this.appointmentModel.countDocuments({
+          patientId: parsedpatientId,
+          consultaionStatus: status,
+        }),
+      ]);
 
-        return result as Appointment[];
-      } else {
-        throw new NotFoundException('Patient Not Found');
-      }
+      // Calculate total pages
+      const totalPages = Math.ceil(totalAppointmentcount / limit);
+
+      return {
+        totalAppointments,
+        totalAppointmentcount,
+        totalPages,
+        currentPage,
+      };
     } catch (error) {
-      return new InternalServerErrorException(
+      console.error('error', error);
+      // Throw exception rather than returning it
+      throw new InternalServerErrorException(
         'Internal Server Error. Try Again',
       );
     }
